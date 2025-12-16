@@ -131,7 +131,12 @@ void MainWindow::onReadyRead()
                 }
             }
         }
-
+        else if(line.startsWith("OK|ROOM_CREATED")){
+            //Server replies: OK|ROOM_CREATED|5 (5 is the new room's ID)
+            QMessageBox::information(this, "Thành công", "Đã tạo phòng đấu giá mới");
+            // Tự động refresh lại list để thấy phòng mình vừa tạo
+            on_btnRefresh_clicked();
+        }
 
 
 

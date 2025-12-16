@@ -15,6 +15,9 @@ public:
     explicit CreateRoomDialog(QWidget *parent = nullptr);
     ~CreateRoomDialog();
 
+    QString productName() const;
+    QString productStartingPrice() const;
+
 private:
     Ui::CreateRoomDialog *ui;
 };
