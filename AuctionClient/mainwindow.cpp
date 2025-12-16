@@ -1,4 +1,5 @@
 #include "mainwindow.h"
+#include "createroomdialog.h"
 #include "ui_mainwindow.h"
 #include <QMessageBox>
 
@@ -59,6 +60,33 @@ void MainWindow::on_btnLeave_clicked()
     // TODO: Gửi lệnh LEAVE_ROOM lên server (cần implement sau)
 }
 
+void MainWindow::on_btnCreateRoom_clicked()
+{
+    CreateRoomDialog dlg(this);
+
+    if (dlg.exec() == QDialog::Accepted) {
+
+        QString productName = dlg.productName();
+        QString productStartingPrice = dlg.productStartingPrice();
+
+        // Validate tối thiểu
+        if (productName.isEmpty()) {
+            QMessageBox::warning(this, "Lỗi", "Tên phòng không được trống");
+            return;
+        }
+
+        // Build message theo protocol
+        QString message = QString("CREATE_ROOM|%1|%2\n")
+                              .arg(productName)
+                              .arg(productStartingPrice);
+
+
+        // Gửi qua socket
+        m_socket->write(message.toUtf8());
+    }
+}
+
+
 // --- XỬ LÝ MẠNG (CORE) ---
 
 void MainWindow::onConnected()
@@ -103,6 +131,9 @@ void MainWindow::onReadyRead()
                 }
             }
         }
+
+
+
 
         // 3. Phản hồi Vào phòng (Join)
         // (Sẽ làm ở bước tiếp theo)
