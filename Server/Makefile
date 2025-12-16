@@ -2,7 +2,7 @@ CXX = g++
 CXXFLAGS = -std=c++17 -pthread -Wall
 
 TARGET = server
-SRC = server_main.cpp
+SRC = main.cpp RoomManager.cpp AuctionServer.cpp
 
 all: $(TARGET)
 
