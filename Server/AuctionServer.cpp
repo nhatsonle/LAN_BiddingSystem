@@ -5,17 +5,11 @@
 #include <cstring>
 
 AuctionServer::AuctionServer(int port) : port(port) {
-#ifdef _WIN32
-    WSADATA wsaData;
-    WSAStartup(MAKEWORD(2, 2), &wsaData);
-#endif
 }
 
 AuctionServer::~AuctionServer() {
-#ifdef _WIN32
-    WSACleanup();
-#endif
 }
+
 
 void AuctionServer::start() {
     // 1. Tạo Socket & Bind (Code cũ của bạn)
@@ -25,19 +19,22 @@ void AuctionServer::start() {
     serverAddr.sin_addr.s_addr = INADDR_ANY;
     serverAddr.sin_port = htons(port);
     
-    bind(serverSocket, (struct sockaddr*)&serverAddr, sizeof(serverAddr));
-    listen(serverSocket, SOMAXCONN);
+    if(bind(serverSocket, (struct sockaddr*)&serverAddr, sizeof(serverAddr)) == -1) {
+        std::cerr << "Bind failed" << std::endl;
+        return;
+    }
+    if(listen(serverSocket, SOMAXCONN) == -1) {
+        std::cerr << "Listen failed" << std::endl;
+        return;
+    }
 
     std::cout << "=== SERVER STARTED ON PORT " << port << " ===" << std::endl;
 
     while (true) {
         sockaddr_in clientAddr;
         int len = sizeof(clientAddr);
-#ifdef _WIN32
-        SocketType clientSocket = accept(serverSocket, (struct sockaddr*)&clientAddr, &len);
-#else
+
         SocketType clientSocket = accept(serverSocket, (struct sockaddr*)&clientAddr, (socklen_t*)&len);
-#endif
         // Tạo thread mới
         std::thread t(&AuctionServer::handleClient, this, clientSocket);
         t.detach();
@@ -65,11 +62,7 @@ void AuctionServer::handleClient(SocketType clientSocket) {
         }
     }
     
-    #ifdef _WIN32
-        closesocket(clientSocket);
-    #else
-        close(clientSocket);
-    #endif
+    close(clientSocket);
 }
 
 std::string AuctionServer::processCommand(SocketType clientSocket, const std::string& msg) {

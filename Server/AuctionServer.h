@@ -7,19 +7,12 @@
 #include <mutex>
 #include "RoomManager.h" // Server cần gọi Manager
 
-// --- Cấu hình Cross-platform ---
-#ifdef _WIN32
-    #include <winsock2.h>
-    #include <ws2tcpip.h>
-    #pragma comment(lib, "ws2_32.lib")
-#else
-    #include <sys/socket.h>
-    #include <netinet/in.h>
-    #include <unistd.h>
-    #define INVALID_SOCKET -1
-    #define SOCKET_ERROR -1
-    typedef int SocketType;
-#endif
+#include <sys/socket.h>
+#include <netinet/in.h>
+#include <unistd.h>
+#define INVALID_SOCKET -1
+#define SOCKET_ERROR -1
+typedef int SocketType;
 
 class AuctionServer {
 public:
