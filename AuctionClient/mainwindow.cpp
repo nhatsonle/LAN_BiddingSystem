@@ -2,6 +2,8 @@
 #include "createroomdialog.h"
 #include "ui_mainwindow.h"
 #include <QMessageBox>
+#include <QTimer>
+#include <QDebug>
 
 MainWindow::MainWindow(QWidget *parent)
     : QMainWindow(parent)
@@ -24,6 +26,22 @@ MainWindow::~MainWindow()
 }
 
 // --- XỬ LÝ NÚT BẤM ---
+
+void MainWindow::on_btnBid_clicked()
+{
+    QString amountStr = ui->txtBidAmount->text();
+    bool ok;
+    int amount = amountStr.toInt(&ok);
+
+    if (!ok) return;
+
+    // Gửi lệnh BID lên Server
+    // Cú pháp: BID|<room_id>|<price>
+    QString cmd = QString("BID|%1|%2\n").arg(m_currentRoomId).arg(amount);
+    m_socket->write(cmd.toUtf8());
+
+    ui->txtBidAmount->clear();
+}
 
 void MainWindow::on_btnLogin_clicked()
 {
@@ -86,6 +104,23 @@ void MainWindow::on_btnCreateRoom_clicked()
     }
 }
 
+void MainWindow::on_btnJoin_clicked(){
+    // Lấy item đang được chọn
+    QListWidgetItem *current = ui->listRooms->currentItem();
+    if (!current) {
+        QMessageBox::warning(this, "Chú ý", "Vui lòng chọn một phòng để tham gia!");
+        return;
+    }
+
+    // Lấy ID từ dữ liệu ẩn
+    int roomId = current->data(Qt::UserRole).toInt();
+
+    // Gửi lệnh JOIN
+    m_socket->write(QString("JOIN_ROOM|%1\n").arg(roomId).toUtf8());
+}
+
+
+
 
 // --- XỬ LÝ MẠNG (CORE) ---
 
@@ -99,7 +134,7 @@ void MainWindow::onReadyRead()
 {
     while (m_socket->canReadLine()) {
         QString line = QString::fromUtf8(m_socket->readLine()).trimmed();
-
+        qDebug() << "Server msg:" << line; // <-- Nhìn vào đây xem có thấy NEW_BID không?
         // --- PHÂN TÍCH GÓI TIN TỪ SERVER ---
 
         // 1. Phản hồi Đăng nhập
@@ -123,11 +158,14 @@ void MainWindow::onReadyRead()
             QStringList rooms = data.split(';', Qt::SkipEmptyParts);
 
             for (const QString &r : rooms) {
-                // r có dạng: "1:Laptop:1500"
-                QStringList parts = r.split(':');
+                QStringList parts = r.split(':'); // 1:Laptop:1500
                 if (parts.size() >= 3) {
-                    QString display = "Phòng " + parts[0] + " - " + parts[1] + " (Giá: " + parts[2] + ")";
-                    ui->listRooms->addItem(display);
+                    QString display = "Phòng " + parts[0] + ": " + parts[1] + " - Giá: " + parts[2];
+                    QListWidgetItem *item = new QListWidgetItem(display);
+                    // LƯU ID VÀO DỮ LIỆU ẨN CỦA ITEM
+                    item->setData(Qt::UserRole, parts[0].toInt());
+
+                    ui->listRooms->addItem(item);
                 }
             }
         }
@@ -137,10 +175,55 @@ void MainWindow::onReadyRead()
             // Tự động refresh lại list để thấy phòng mình vừa tạo
             on_btnRefresh_clicked();
         }
+        // 1. XỬ LÝ VÀO PHÒNG THÀNH CÔNG
+        // Server: OK|JOINED|<id>|<name>|<price>
+        else if (line.startsWith("OK|JOINED")) {
+            QStringList parts = line.split('|');
+            if (parts.size() >= 5) {
+                m_currentRoomId = parts[2].toInt(); // Lưu ID phòng đang ở
+                QString name = parts[3];
+                QString price = parts[4];
 
+                // Cập nhật UI trang Room
+                ui->lblRoomName->setText("Đang đấu giá: " + name);
+                ui->lblCurrentPrice->setText(price);
+                ui->txtRoomLog->clear();
+                ui->txtRoomLog->append("--- Bắt đầu phiên đấu giá ---");
 
+                // Chuyển trang
+                ui->stackedWidget->setCurrentIndex(2); // Page Room
+            }
+        }
 
-        // 3. Phản hồi Vào phòng (Join)
-        // (Sẽ làm ở bước tiếp theo)
-    }
+        // 2. XỬ LÝ KHI CÓ NGƯỜI RA GIÁ (BROADCAST)
+        // Server: NEW_BID|<price>|<user_socket>
+        else if (line.startsWith("NEW_BID")) {
+            // In ra chuỗi thô để xem có ký tự lạ không
+            qDebug() << "1. Raw string received:" << line;
+
+            QStringList parts = line.split('|');
+            qDebug() << "2. Split size:" << parts.size(); // Phải >= 3 mới đúng
+
+            if (parts.size() >= 3) {
+                QString newPrice = parts[1];
+                QString userSocket = parts[2];
+
+                qDebug() << "3. New Price extracted:" << newPrice;
+
+                // --- CẬP NHẬT GIAO DIỆN ---
+
+                // Cố tình update cứng để test xem Label có chết không
+                // Nếu dòng này chạy mà giao diện không đổi -> Label bị lỗi kết nối UI
+                ui->lblCurrentPrice->setText(newPrice);
+
+                ui->txtRoomLog->append("User " + userSocket + " trả giá: " + newPrice);
+
+                qDebug() << "4. UI Updated successfully!";
+            } else {
+                qDebug() << "ERROR: Split size wrong! Check protocol separator.";
+            }
+        }
 }
+}
+
+

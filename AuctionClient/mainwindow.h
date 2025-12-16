@@ -21,13 +21,16 @@ private slots:
     void onReadyRead();
 
     // Slot cho các nút bấm mới
+    void on_btnJoin_clicked();
     void on_btnLogin_clicked();
     void on_btnRefresh_clicked(); // Nút lấy danh sách phòng
     void on_btnLeave_clicked();   // Nút rời phòng quay lại sảnh
     void on_btnCreateRoom_clicked();
+    void on_btnBid_clicked();
 private:
     Ui::MainWindow *ui;
     QTcpSocket *m_socket; // Đối tượng quản lý kết nối
     QString m_username; // Lưu tên người dùng hiện tại
+    int m_currentRoomId;
 };
 #endif // MAINWINDOW_H

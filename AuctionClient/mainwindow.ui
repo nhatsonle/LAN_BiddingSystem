@@ -18,7 +18,7 @@
     <item row="0" column="1">
      <widget class="QStackedWidget" name="stackedWidget">
       <property name="currentIndex">
-       <number>1</number>
+       <number>2</number>
       </property>
       <widget class="QWidget" name="Login">
        <widget class="QLineEdit" name="txtUser">
@@ -145,7 +145,7 @@
          <rect>
           <x>50</x>
           <y>40</y>
-          <width>71</width>
+          <width>101</width>
           <height>16</height>
          </rect>
         </property>
