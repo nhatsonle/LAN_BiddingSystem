@@ -34,6 +34,21 @@ vector<Room> rooms;
 mutex roomsMutex; // Khóa bảo vệ danh sách phòng
 int roomIdCounter = 1; // Tự động tăng ID phòng
 
+//Hàm này chỉ gửi tin nhắn cho những người đang xem phòng đó
+void broadcastToRoom(int roomId, const string& message) {
+    lock_guard<mutex> lock(roomsMutex); // Lock lại để an toàn
+    
+    for (auto& room : rooms) {
+        if (room.id == roomId) {
+            for (auto sock : room.participants) {
+                // Gửi tin nhắn đến từng người trong phòng
+                send(sock, message.c_str(), message.length(), 0);
+            }
+            break; // Tìm thấy phòng rồi thì thoát loop
+        }
+    }
+}
+
 // 2. Hàm cắt chuỗi (Split String)
 // Ví dụ: "LOGIN|admin|123" -> ["LOGIN", "admin", "123"]
 vector<string> split(const string &s, char delimiter) {
@@ -46,11 +61,11 @@ vector<string> split(const string &s, char delimiter) {
     return tokens;
 }
 // 3. Hàm xử lý lệnh (Core Logic)
-std::string processCommand(SocketType clientSocket, const std::string& msg) {
+string processCommand(SocketType clientSocket, const string& msg) {
     auto tokens = split(msg, '|');
     if (tokens.empty()) return "ERR|EMPTY_COMMAND";
 
-    std::string command = tokens[0];
+    string command = tokens[0];
 
     // --- LỆNH: ĐĂNG NHẬP ---
     if (command == "LOGIN") {
@@ -64,8 +79,8 @@ std::string processCommand(SocketType clientSocket, const std::string& msg) {
     else if (command == "CREATE_ROOM") {
         if (tokens.size() < 3) return "ERR|MISSING_ARGS";
         
-        std::string itemName = tokens[1];
-        int startPrice = std::stoi(tokens[2]); // Chuyển chuỗi sang số
+        string itemName = tokens[1];
+        int startPrice = stoi(tokens[2]); // Chuyển chuỗi sang số
 
         Room newRoom;
         newRoom.id = roomIdCounter++; // Tăng ID lên
@@ -75,23 +90,23 @@ std::string processCommand(SocketType clientSocket, const std::string& msg) {
 
         // Critical Section: Thêm vào danh sách chung
         {
-            std::lock_guard<std::mutex> lock(roomsMutex);
+            lock_guard<mutex> lock(roomsMutex);
             rooms.push_back(newRoom);
         }
 
-        return "OK|ROOM_CREATED|" + std::to_string(newRoom.id);
+        return "OK|ROOM_CREATED|" + to_string(newRoom.id);
     }
 
     // --- LỆNH: LIỆT KÊ PHÒNG ---
     else if (command == "LIST_ROOMS") {
-        std::string response = "OK|LIST|";
+        string response = "OK|LIST|";
         
-        std::lock_guard<std::mutex> lock(roomsMutex);
+        lock_guard<mutex> lock(roomsMutex);
         if (rooms.empty()) return "OK|LIST|EMPTY";
 
         for (const auto& r : rooms) {
             // Định dạng trả về: ID:Name:Price;
-            response += std::to_string(r.id) + ":" + r.itemName + ":" + std::to_string(r.currentPrice) + ";";
+            response += to_string(r.id) + ":" + r.itemName + ":" + to_string(r.currentPrice) + ";";
         }
         return response;
     }
@@ -101,10 +116,10 @@ std::string processCommand(SocketType clientSocket, const std::string& msg) {
     else if (command == "BID") {
         if (tokens.size() < 3) return "ERR|MISSING_ARGS";
         
-        int rId = std::stoi(tokens[1]);
-        int bidPrice = std::stoi(tokens[2]);
+        int rId = stoi(tokens[1]);
+        int bidPrice = stoi(tokens[2]);
 
-        std::lock_guard<std::mutex> lock(roomsMutex);
+        lock_guard<mutex> lock(roomsMutex);
         
         // Tìm phòng
         Room* targetRoom = nullptr;
@@ -123,9 +138,72 @@ std::string processCommand(SocketType clientSocket, const std::string& msg) {
             targetRoom->highestBidderSocket = clientSocket;
             
             // TODO: Ở đây cần Broadcast cho mọi người trong phòng biết (Sẽ làm ở bước sau)
-            return "OK|BID_SUCCESS|" + std::to_string(bidPrice);
+            return "OK|BID_SUCCESS|" + to_string(bidPrice);
         } else {
-            return "ERR|PRICE_TOO_LOW|Current is " + std::to_string(targetRoom->currentPrice);
+            return "ERR|PRICE_TOO_LOW|Current is " + to_string(targetRoom->currentPrice);
+        }
+    }
+  // --- LỆNH: VÀO PHÒNG ---
+    // Cú pháp: JOIN_ROOM|<room_id>  
+    else if (command == "JOIN_ROOM") {
+        if (tokens.size() < 2) return "ERR|MISSING_ARGS";
+        int rId = stoi(tokens[1]);
+        
+        lock_guard<mutex> lock(roomsMutex);
+        for (auto& r : rooms) {
+            if (r.id == rId) {
+                // Thêm socket này vào danh sách người tham gia
+                r.participants.push_back(clientSocket);
+                
+                // Trả về thông tin hiện tại của phòng để Client hiển thị
+                // Format: OK|JOINED|<id>|<name>|<current_price>
+                return "OK|JOINED|" + to_string(r.id) + "|" + r.itemName + "|" + to_string(r.currentPrice);
+            }
+        }
+        return "ERR|ROOM_NOT_FOUND";
+    }
+    // --- LỆNH: ĐẤU GIÁ ---
+    // Cú pháp: BID|<room_id>|<price>
+    else if (command == "BID") {
+        if (tokens.size() < 3) return "ERR|MISSING_ARGS";
+        int rId = stoi(tokens[1]);
+        int bidPrice = stoi(tokens[2]);
+
+        // (Lưu ý: Không lock ở đây nữa vì hàm broadcastToRoom sẽ lock, tránh deadlock)
+        // Chúng ta sẽ tìm phòng và xử lý cục bộ trước
+        bool success = false;
+        string broadcastMsg;
+
+        {
+            lock_guard<mutex> lock(roomsMutex);
+            for (auto& r : rooms) {
+                if (r.id == rId) {
+                    if (bidPrice > r.currentPrice) {
+                        r.currentPrice = bidPrice;
+                        r.highestBidderSocket = clientSocket;
+                        success = true;
+                        
+                        // Chuẩn bị tin nhắn để báo cho cả phòng
+                        // Format: NEW_BID|<price>|<user_id_tam_thoi>
+                        broadcastMsg = "NEW_BID|" + to_string(bidPrice) + "|" + to_string(clientSocket) + "\n";
+                    }
+                    break;
+                }
+            }
+        }
+
+        if (success) {
+            // Gửi thông báo cho TẤT CẢ mọi người trong phòng (bao gồm cả người bid)
+            // Lưu ý: broadcastToRoom tự nó sẽ lock mutex, nên ta gọi nó ngoài scope lock ở trên
+            // Tuy nhiên, logic broadcastToRoom mình viết ở trên có lock, nên phải cẩn thận.
+            // Để đơn giản cho bài tập: Ta sẽ chấp nhận lock 2 lần (recursive) hoặc bỏ lock trong broadcastToRoom.
+            // TỐT NHẤT: Copy logic broadcast vào đây để tránh deadlock hoặc sửa broadcastToRoom bỏ lock đi.
+            
+            // --> Cách an toàn nhất: Gọi broadcast ngoài lock scope
+             broadcastToRoom(rId, broadcastMsg);
+             return "OK|BID_ACCEPTED"; // Server trả lời riêng cho người gửi để xác nhận
+        } else {
+            return "ERR|PRICE_TOO_LOW";
         }
     }
 
@@ -201,23 +279,15 @@ void handleClient(SocketType clientSocket) {
 
 // --- MAIN FUNCTION ---
 int main() {
-    // 1. Khởi tạo Winsock (Chỉ dành cho Windows)
-#ifdef _WIN32
-    WSADATA wsaData;
-    if (WSAStartup(MAKEWORD(2, 2), &wsaData) != 0) {
-        std::cerr << "WSAStartup failed" << std::endl;
-        return 1;
-    }
-#endif
 
-    // 2. Tạo Socket
+    // 1. Tạo Socket
     SocketType serverSocket = socket(AF_INET, SOCK_STREAM, 0);
     if (serverSocket == INVALID_SOCKET) {
         cerr << "Can't create socket" << endl;
         return 1;
     }
 
-    // 3. Bind địa chỉ IP và Port
+    // 2. Bind địa chỉ IP và Port
     sockaddr_in serverAddr;
     serverAddr.sin_family = AF_INET;
     serverAddr.sin_addr.s_addr = INADDR_ANY; // Chấp nhận mọi IP
@@ -228,7 +298,7 @@ int main() {
         return 1;
     }
 
-    // 4. Listen (Lắng nghe kết nối)
+    // 3. Listen (Lắng nghe kết nối)
     if (listen(serverSocket, SOMAXCONN) == SOCKET_ERROR) {
         cerr << "Listen failed" << endl;
         return 1;
@@ -236,16 +306,12 @@ int main() {
 
     cout << "=== AUCTION SERVER STARTED ON PORT " << PORT << " ===" << endl;
 
-    // 5. Vòng lặp chấp nhận Client
+    // 4. Vòng lặp chấp nhận Client
     while (true) {
         sockaddr_in clientAddr;
         int clientAddrSize = sizeof(clientAddr);
         
-#ifdef _WIN32
-        SocketType clientSocket = accept(serverSocket, (struct sockaddr*)&clientAddr, &clientAddrSize);
-#else
         SocketType clientSocket = accept(serverSocket, (struct sockaddr*)&clientAddr, (socklen_t*)&clientAddrSize);
-#endif
 
         if (clientSocket == INVALID_SOCKET) {
             cerr << "Accept failed" << endl;
@@ -264,12 +330,8 @@ int main() {
     }
 
     // Dọn dẹp (Thực tế code server ít khi chạy đến đây trừ khi có lệnh tắt)
-#ifdef _WIN32
-    closesocket(serverSocket);
-    WSACleanup();
-#else
+
     close(serverSocket);
-#endif
 
     return 0;
 }
