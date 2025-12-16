@@ -8,20 +8,14 @@
 #include <sstream>
 
 using namespace std;
-// --- CẤU HÌNH CHO WINDOWS VÀ LINUX ---
-#ifdef _WIN32
-    #include <winsock2.h>
-    #include <ws2tcpip.h>
-    #pragma comment(lib, "ws2_32.lib") // Link thư viện Winsock cho Visual Studio
-    typedef SOCKET SocketType;
-#else
-    #include <sys/socket.h>
-    #include <netinet/in.h>
-    #include <unistd.h>
-    typedef int SocketType;
-    #define INVALID_SOCKET -1
-    #define SOCKET_ERROR -1
-#endif
+
+#include <sys/socket.h>
+#include <netinet/in.h>
+#include <unistd.h>
+typedef int SocketType;
+#define INVALID_SOCKET -1
+#define SOCKET_ERROR -1
+
 
 // Cấu hình Server
 const int PORT = 8080;
