@@ -30,3 +30,7 @@ QString CreateRoomDialog::productStartingPrice() const
     return QString::number(ui->spinPrice->value());
 }
 
+QString CreateRoomDialog::productBuyNowPrice() const
+{
+    return QString::number(ui->spinBuyNow->value());
+}

@@ -17,6 +17,7 @@ public:
 
     QString productName() const;
     QString productStartingPrice() const;
+    QString productBuyNowPrice() const;
 
 private:
     Ui::CreateRoomDialog *ui;

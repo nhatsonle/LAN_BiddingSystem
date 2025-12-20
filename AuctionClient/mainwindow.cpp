@@ -81,9 +81,23 @@ void MainWindow::on_btnRefresh_clicked()
 }
 void MainWindow::on_btnLeave_clicked()
 {
-    // Quay lại sảnh
-    ui->stackedWidget->setCurrentIndex(1);
-    // TODO: Gửi lệnh LEAVE_ROOM lên server (cần implement sau)
+    // 1. Gửi thông báo cho Server biết mình rút lui
+    if (m_socket->state() == QAbstractSocket::ConnectedState) {
+        QString cmd = QString("LEAVE_ROOM|%1\n").arg(m_currentRoomId);
+        m_socket->write(cmd.toUtf8());
+    }
+
+    // 2. Xử lý giao diện (UI)
+    ui->stackedWidget->setCurrentIndex(1); // Quay về trang Lobby
+
+    // Xóa log chat cũ để lần sau vào phòng khác không bị lẫn lộn
+    ui->txtRoomLog->clear();
+
+    // (Tùy chọn) Reset ID phòng hiện tại
+    m_currentRoomId = -1;
+
+    // (Tùy chọn) Refresh lại danh sách phòng ngoài sảnh để cập nhật giá mới nhất
+    on_btnRefresh_clicked();
 }
 
 void MainWindow::on_btnCreateRoom_clicked()
@@ -94,6 +108,7 @@ void MainWindow::on_btnCreateRoom_clicked()
 
         QString productName = dlg.productName();
         QString productStartingPrice = dlg.productStartingPrice();
+        QString buyNow = dlg.productBuyNowPrice();
 
         // Validate tối thiểu
         if (productName.isEmpty()) {
@@ -102,10 +117,10 @@ void MainWindow::on_btnCreateRoom_clicked()
         }
 
         // Build message theo protocol
-        QString message = QString("CREATE_ROOM|%1|%2\n")
+        QString message = QString("CREATE_ROOM|%1|%2|%3\n")
                               .arg(productName)
-                              .arg(productStartingPrice);
-
+                              .arg(productStartingPrice)
+                              .arg(buyNow);
 
         // Gửi qua socket
         m_socket->write(message.toUtf8());
@@ -127,6 +142,19 @@ void MainWindow::on_btnJoin_clicked(){
     m_socket->write(QString("JOIN_ROOM|%1\n").arg(roomId).toUtf8());
 }
 
+void MainWindow::on_btnBuyNow_clicked()
+{
+    // Hiển thị hộp thoại xác nhận cho chắc ăn
+    QMessageBox::StandardButton reply;
+    reply = QMessageBox::question(this, "Xác nhận", "Bạn có chắc muốn mua ngay sản phẩm này?",
+                                  QMessageBox::Yes|QMessageBox::No);
+
+    if (reply == QMessageBox::Yes) {
+        // Gửi lệnh
+        m_socket->write(QString("BUY_NOW|%1\n").arg(m_currentRoomId).toUtf8());
+    }
+}
+
 
 
 
@@ -137,6 +165,8 @@ void MainWindow::onConnected()
     // Có thể hiện thông báo nhỏ ở thanh status bar
     statusBar()->showMessage("Đã kết nối Server");
 }
+
+
 
 void MainWindow::onReadyRead()
 {

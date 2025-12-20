@@ -17,6 +17,7 @@ struct Room {
     int timeLeft; // Thời gian còn lại để đấu giá (tính bằng giây)
     bool isClosed;//Trạng thái phòng đấu giá
     int initialDuration; // Thời gian đấu giá ban đầu (tính bằng giây)
+    int buyNowPrice; // Giá mua ngay
 };
 
 #endif

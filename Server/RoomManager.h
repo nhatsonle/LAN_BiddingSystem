@@ -28,13 +28,13 @@ public:
     void operator=(const RoomManager&) = delete;
 
     // Các hàm nghiệp vụ
-    int createRoom(std::string itemName, int startPrice);
+    int createRoom(std::string itemName, int startPrice, int buyNowPrice);
     std::string getRoomList();
     bool joinRoom(int roomId, SocketType clientSocket, std::string& outRoomInfo);
-    
+    bool buyNow(int roomId, SocketType buyerSocket, std::string& outMsg);
     // Hàm xử lý Bid: Trả về true nếu thành công, cập nhật broadcastMsg
     bool placeBid(int roomId, int amount, SocketType bidderSocket, std::string& outBroadcastMsg);
-
+    bool leaveRoom(int roomId, SocketType clientSocket);
     // Lấy danh sách socket trong phòng để gửi tin
     std::vector<SocketType> getParticipants(int roomId);
     // Định nghĩa kiểu hàm Callback: Nhận vào roomID và nội dung tin nhắn
@@ -42,6 +42,7 @@ public:
 
     // Hàm cập nhật thời gian (Được gọi mỗi giây)
     void updateTimers(BroadcastCallback callback);
+    void removeClient(SocketType clientSocket);
 };
 
 #endif

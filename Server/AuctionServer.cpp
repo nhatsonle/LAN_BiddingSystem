@@ -95,9 +95,26 @@ std::string AuctionServer::processCommand(SocketType clientSocket, const std::st
     if (cmd == "LOGIN") {
         return "OK|LOGIN_SUCCESS|Welcome";
     }
-    else if (cmd == "CREATE_ROOM") { // CREATE_ROOM|Name|Price
-        int newId = RoomManager::getInstance().createRoom(tokens[1], std::stoi(tokens[2]));
+    else if (cmd == "CREATE_ROOM") { 
+        // Cú pháp mới: CREATE_ROOM|Name|StartPrice|BuyNowPrice
+        if (tokens.size() < 4) return "ERR|MISSING_ARGS"; // Cần 4 tham số
+        
+        int startP = std::stoi(tokens[2]);
+        int buyNowP = std::stoi(tokens[3]);
+        
+        int newId = RoomManager::getInstance().createRoom(tokens[1], startP, buyNowP);
         return "OK|ROOM_CREATED|" + std::to_string(newId);
+    }
+    else if (cmd == "BUY_NOW") { // Cú pháp: BUY_NOW|<room_id>
+        int rId = std::stoi(tokens[1]);
+        std::string broadcastMsg;
+        
+        if (RoomManager::getInstance().buyNow(rId, clientSocket, broadcastMsg)) {
+            broadcastToRoom(rId, broadcastMsg); // Gửi SOLD cho cả phòng
+            return "OK|BUY_NOW_SUCCESS";
+        } else {
+            return "ERR|CANNOT_BUY_NOW";
+        }
     }
     else if (cmd == "LIST_ROOMS") {
         std::string list = RoomManager::getInstance().getRoomList();
@@ -124,6 +141,17 @@ std::string AuctionServer::processCommand(SocketType clientSocket, const std::st
             return "ERR|PRICE_TOO_LOW";
         }
     }
+    else if (cmd == "LEAVE_ROOM") { // Client gửi: LEAVE_ROOM|<room_id>
+        if (tokens.size() < 2) return "ERR|MISSING_ARGS";
+        
+        int rId = std::stoi(tokens[1]);
+        if (RoomManager::getInstance().leaveRoom(rId, clientSocket)) {
+            return "OK|LEFT_ROOM";
+        } else {
+            return "ERR|ROOM_NOT_FOUND_OR_NOT_IN";
+        }
+    }
+    // ...
     
     return "ERR|UNKNOWN";
 }

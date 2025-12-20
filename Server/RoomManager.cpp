@@ -1,13 +1,14 @@
 #include "RoomManager.h"
 #include <iostream>
 
-int RoomManager::createRoom(std::string itemName, int startPrice) {
+int RoomManager::createRoom(std::string itemName, int startPrice, int buyNowPrice) {
     std::lock_guard<std::recursive_mutex> lock(roomsMutex);
     Room newRoom;
     newRoom.id = roomIdCounter++;
     newRoom.itemName = itemName;
     newRoom.currentPrice = startPrice;
     newRoom.highestBidderSocket = -1;
+    newRoom.buyNowPrice = buyNowPrice;
 
     // --- KHỞI TẠO TIMER ---
     newRoom.initialDuration = 30; // Mặc định 5 phút (300 giây)
@@ -17,6 +18,29 @@ int RoomManager::createRoom(std::string itemName, int startPrice) {
 
     rooms.push_back(newRoom);
     return newRoom.id;
+}
+
+bool RoomManager::buyNow(int roomId, SocketType buyerSocket, std::string& outMsg) {
+    std::lock_guard<std::recursive_mutex> lock(roomsMutex);
+    
+    for (auto& r : rooms) {
+        if (r.id == roomId) {
+            if (r.isClosed) return false; // Phòng đóng rồi thì thôi
+
+            // 1. Cập nhật trạng thái thắng cuộc
+            r.isClosed = true;          // Đóng phòng ngay lập tức
+            r.timeLeft = 0;             // Thời gian về 0
+            r.currentPrice = r.buyNowPrice; // Giá chốt = Giá mua ngay
+            r.highestBidderSocket = buyerSocket;
+            
+            // 2. Chuẩn bị tin nhắn SOLD (Tái sử dụng logic của Timer)
+            // Format: SOLD|<price>|<winner_id>
+            outMsg = "SOLD|" + std::to_string(r.buyNowPrice) + "|" + std::to_string(buyerSocket) + "\n";
+            
+            return true;
+        }
+    }
+    return false;
 }
 
 std::string RoomManager::getRoomList() {
@@ -82,12 +106,52 @@ std::vector<SocketType> RoomManager::getParticipants(int roomId) {
     return {};
 }
 
+void RoomManager::removeClient(SocketType clientSocket) {
+    std::lock_guard<std::recursive_mutex> lock(roomsMutex);
+    
+    for (auto& room : rooms) {
+        // Duyệt tìm và xóa socket khỏi vector participants
+        auto it = std::remove(room.participants.begin(), room.participants.end(), clientSocket);
+        
+        if (it != room.participants.end()) {
+            room.participants.erase(it, room.participants.end());
+            std::cout << "[INFO] Removed client " << clientSocket << " from Room " << room.id << std::endl;
+        }
+    }
+}
+
+bool RoomManager::leaveRoom(int roomId, SocketType clientSocket) {
+    std::lock_guard<std::recursive_mutex> lock(roomsMutex);
+    
+    for (auto& r : rooms) {
+        if (r.id == roomId) {
+            // Tìm và xóa socket khỏi danh sách participants
+            auto it = std::remove(r.participants.begin(), r.participants.end(), clientSocket);
+            
+            if (it != r.participants.end()) {
+                r.participants.erase(it, r.participants.end());
+                std::cout << "[INFO] Client " << clientSocket << " left Room " << roomId << std::endl;
+                
+                // Nếu phòng trống -> Timer sẽ tự động dừng ở lần updateTimers tiếp theo
+                return true;
+            }
+        }
+    }
+    return false;
+}
+
 void RoomManager::updateTimers(BroadcastCallback callback) {
     std::lock_guard<std::recursive_mutex> lock(roomsMutex); // Khóa lại để duyệt an toàn
     
     for (auto& r : rooms) {
         if (r.isClosed) continue; // Phòng đóng rồi thì bỏ qua
 
+        //KIỂM TRA NGƯỜI DÙNG ---
+        if (r.participants.empty()) {
+            // Phòng trống -> Không trừ giờ -> Timer đứng yên
+            // (Tùy chọn: Có thể reset lại giờ về ban đầu nếu muốn: r.timeLeft = r.initialDuration;)
+            continue; 
+        }
         r.timeLeft--; // Trừ 1 giây
 
         if (r.timeLeft > 0) {
