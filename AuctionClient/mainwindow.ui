@@ -167,13 +167,13 @@
         <property name="geometry">
          <rect>
           <x>50</x>
-          <y>130</y>
+          <y>100</y>
           <width>101</width>
           <height>31</height>
          </rect>
         </property>
         <property name="text">
-         <string>Gia hien tai</string>
+         <string>Giá hiện tại</string>
         </property>
        </widget>
        <widget class="QTextBrowser" name="txtRoomLog">
@@ -189,8 +189,8 @@
        <widget class="QLineEdit" name="txtBidAmount">
         <property name="geometry">
          <rect>
-          <x>50</x>
-          <y>180</y>
+          <x>230</x>
+          <y>100</y>
           <width>113</width>
           <height>23</height>
          </rect>
@@ -220,6 +220,45 @@
         </property>
         <property name="text">
          <string>Rời phòng</string>
+        </property>
+       </widget>
+       <widget class="QPushButton" name="btnBuyNow">
+        <property name="geometry">
+         <rect>
+          <x>350</x>
+          <y>180</y>
+          <width>83</width>
+          <height>24</height>
+         </rect>
+        </property>
+        <property name="text">
+         <string>MUA NGAY</string>
+        </property>
+       </widget>
+       <widget class="QLabel" name="lblBuyNowPrice">
+        <property name="geometry">
+         <rect>
+          <x>230</x>
+          <y>140</y>
+          <width>111</width>
+          <height>21</height>
+         </rect>
+        </property>
+        <property name="text">
+         <string>0 VND</string>
+        </property>
+       </widget>
+       <widget class="QLabel" name="lblCurrentPrice_2">
+        <property name="geometry">
+         <rect>
+          <x>50</x>
+          <y>140</y>
+          <width>101</width>
+          <height>31</height>
+         </rect>
+        </property>
+        <property name="text">
+         <string>Giá mua ngay</string>
         </property>
        </widget>
       </widget>

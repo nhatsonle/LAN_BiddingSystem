@@ -1,8 +1,13 @@
 #include "RoomManager.h"
 #include <iostream>
+#include "DatabaseManager.h"
 
-int RoomManager::createRoom(std::string itemName, int startPrice, int buyNowPrice) {
-    std::lock_guard<std::recursive_mutex> lock(roomsMutex);
+int RoomManager::createRoom(std::string itemName, int startPrice, int buyNowPrice, int duration) {    std::lock_guard<std::recursive_mutex> lock(roomsMutex);
+
+    if (buyNowPrice <= startPrice) {
+        return -1; // Mã lỗi
+    }
+
     Room newRoom;
     newRoom.id = roomIdCounter++;
     newRoom.itemName = itemName;
@@ -10,9 +15,9 @@ int RoomManager::createRoom(std::string itemName, int startPrice, int buyNowPric
     newRoom.highestBidderSocket = -1;
     newRoom.buyNowPrice = buyNowPrice;
 
-    // --- KHỞI TẠO TIMER ---
-    newRoom.initialDuration = 30; // Mặc định 5 phút (300 giây)
-    newRoom.timeLeft = 30;
+// --- CẬP NHẬT THỜI GIAN TỪ THAM SỐ ---
+    newRoom.initialDuration = duration; 
+    newRoom.timeLeft = duration;
     newRoom.isClosed = false;
     // ---------------------
 
@@ -61,8 +66,16 @@ bool RoomManager::joinRoom(int roomId, SocketType clientSocket, std::string& out
     for (auto& r : rooms) {
         if (r.id == roomId) {
             r.participants.push_back(clientSocket);
-            // Tạo chuỗi thông tin trả về: ID|Name|Price
-            outRoomInfo = std::to_string(r.id) + "|" + r.itemName + "|" + std::to_string(r.currentPrice);
+            
+            // --- CẬP NHẬT DÒNG NÀY ---
+            // Format cũ: ID|Name|CurrentPrice
+            // Format mới: ID|Name|CurrentPrice|BuyNowPrice
+            outRoomInfo = std::to_string(r.id) + "|" + 
+                          r.itemName + "|" + 
+                          std::to_string(r.currentPrice) + "|" + 
+                          std::to_string(r.buyNowPrice); // <-- Thêm cái này
+            // -------------------------
+            
             return true;
         }
     }
@@ -75,8 +88,8 @@ bool RoomManager::placeBid(int roomId, int amount, SocketType bidderSocket, std:
         if (r.id == roomId) {
             // Kiểm tra: Nếu phòng đã đóng thì không cho bid
             if (r.isClosed) return false; 
-
-            if (amount > r.currentPrice) {
+            // Yêu cầu: Giá mới phải cao hơn giá cũ ít nhất 10.000
+            if (amount > r.currentPrice + 10000) {
                 r.currentPrice = amount;
                 r.highestBidderSocket = bidderSocket;
                 
@@ -169,6 +182,17 @@ void RoomManager::updateTimers(BroadcastCallback callback) {
             if (r.highestBidderSocket != -1) {
                 // Có người mua
                 msg = "SOLD|" + std::to_string(r.currentPrice) + "|" + std::to_string(r.highestBidderSocket) + "\n";
+                // --- LƯU VÀO DB ---
+                // Lưu ý: r.highestBidderSocket hiện là Socket ID. 
+                // Nếu muốn đẹp bạn cần ánh xạ Socket -> Username (cần map<int, string> userMap)
+                // Tạm thời lưu Socket ID làm "Winner Name"
+                DatabaseManager::getInstance().saveAuctionResult(
+                    r.id, 
+                    r.itemName, 
+                    r.currentPrice, 
+                    std::to_string(r.highestBidderSocket) // Hoặc tên user thật nếu bạn đã làm
+                );
+                // ------------------
             } else {
                 // Không ai mua
                 msg = "CLOSED|NO_BID\n";

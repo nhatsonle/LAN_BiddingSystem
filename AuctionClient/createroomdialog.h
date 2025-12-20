@@ -18,7 +18,11 @@ public:
     QString productName() const;
     QString productStartingPrice() const;
     QString productBuyNowPrice() const;
+    QString auctionDuration() const;
 
+private slots:
+    // Thêm slot này
+    void onVerifyAndAccept();
 private:
     Ui::CreateRoomDialog *ui;
 };

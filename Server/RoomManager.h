@@ -28,8 +28,7 @@ public:
     void operator=(const RoomManager&) = delete;
 
     // Các hàm nghiệp vụ
-    int createRoom(std::string itemName, int startPrice, int buyNowPrice);
-    std::string getRoomList();
+    int createRoom(std::string itemName, int startPrice, int buyNowPrice, int duration);    std::string getRoomList();
     bool joinRoom(int roomId, SocketType clientSocket, std::string& outRoomInfo);
     bool buyNow(int roomId, SocketType buyerSocket, std::string& outMsg);
     // Hàm xử lý Bid: Trả về true nếu thành công, cập nhật broadcastMsg

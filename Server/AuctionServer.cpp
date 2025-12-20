@@ -5,6 +5,7 @@
 #include <cstring>
 #include <chrono>
 #include <thread>
+#include "DatabaseManager.h"
 
 AuctionServer::AuctionServer(int port) : port(port) {
 }
@@ -92,17 +93,40 @@ std::string AuctionServer::processCommand(SocketType clientSocket, const std::st
 
     // --- GỌI QUA ROOM MANAGER ---
     
-    if (cmd == "LOGIN") {
-        return "OK|LOGIN_SUCCESS|Welcome";
+    // ... trong processCommand ...
+    if (cmd == "LOGIN") { // LOGIN|user|pass
+        if (tokens.size() < 3) return "ERR|MISSING_ARGS";
+        std::string u = tokens[1];
+        std::string p = tokens[2];
+
+        // GỌI DB ĐỂ CHECK
+        if (DatabaseManager::getInstance().checkLogin(u, p)) {
+            return "OK|LOGIN_SUCCESS|Welcome " + u;
+        } else {
+            return "ERR|LOGIN_FAILED";
+        }
+    }
+    else if (cmd == "REGISTER") { // REGISTER|user|pass
+        // Logic đăng ký
+        if (DatabaseManager::getInstance().registerUser(tokens[1], tokens[2])) {
+            return "OK|REGISTER_SUCCESS";
+        } else {
+            return "ERR|USER_EXISTS";
+        }
     }
     else if (cmd == "CREATE_ROOM") { 
-        // Cú pháp mới: CREATE_ROOM|Name|StartPrice|BuyNowPrice
-        if (tokens.size() < 4) return "ERR|MISSING_ARGS"; // Cần 4 tham số
+        // Format: CREATE_ROOM|Name|StartPrice|BuyNowPrice|Duration
+        if (tokens.size() < 5) return "ERR|MISSING_ARGS"; // Cần 5 tham số
         
         int startP = std::stoi(tokens[2]);
         int buyNowP = std::stoi(tokens[3]);
+        int duration = std::stoi(tokens[4]); // Đọc tham số thứ 5
         
-        int newId = RoomManager::getInstance().createRoom(tokens[1], startP, buyNowP);
+        // Gọi hàm với tham số duration
+        int newId = RoomManager::getInstance().createRoom(tokens[1], startP, buyNowP, duration);
+        
+        if (newId == -1) return "ERR|INVALID_PRICE_CONFIG";
+
         return "OK|ROOM_CREATED|" + std::to_string(newId);
     }
     else if (cmd == "BUY_NOW") { // Cú pháp: BUY_NOW|<room_id>

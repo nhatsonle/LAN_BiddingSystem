@@ -29,18 +29,23 @@ MainWindow::~MainWindow()
 
 void MainWindow::on_btnBid_clicked()
 {
-    QString amountStr = ui->txtBidAmount->text();
-    bool ok;
-    int amount = amountStr.toInt(&ok);
+    // 1. Lấy giá hiện tại từ giao diện (bóc tách từ chuỗi hiển thị hoặc lưu biến riêng)
 
-    if (!ok) return;
+    int currentPrice = ui->lblCurrentPrice->text().toInt();
+    int bidAmount = ui->txtBidAmount->text().toInt();
 
-    // Gửi lệnh BID lên Server
-    // Cú pháp: BID|<room_id>|<price>
-    QString cmd = QString("BID|%1|%2\n").arg(m_currentRoomId).arg(amount);
-    m_socket->write(cmd.toUtf8());
+    // 2. Kiểm tra quy tắc +10.000
+    if (bidAmount < currentPrice + 10000) {
+        QMessageBox::warning(this, "Không hợp lệ",
+                             "Giá đấu phải cao hơn giá hiện tại ít nhất 10.000 VND!");
+        return; // Dừng lại ngay, KHÔNG gửi gì lên Server cả
+    }
 
-    ui->txtBidAmount->clear();
+    // 3. Nếu OK thì mới gửi
+    if (m_socket->state() == QAbstractSocket::ConnectedState) {
+        QString msg = QString("BID|%1|%2\n").arg(m_currentRoomId).arg(bidAmount);
+        m_socket->write(msg.toUtf8());
+    }
 }
 
 void MainWindow::on_btnLogin_clicked()
@@ -109,6 +114,7 @@ void MainWindow::on_btnCreateRoom_clicked()
         QString productName = dlg.productName();
         QString productStartingPrice = dlg.productStartingPrice();
         QString buyNow = dlg.productBuyNowPrice();
+        QString duration = dlg.auctionDuration();
 
         // Validate tối thiểu
         if (productName.isEmpty()) {
@@ -117,10 +123,11 @@ void MainWindow::on_btnCreateRoom_clicked()
         }
 
         // Build message theo protocol
-        QString message = QString("CREATE_ROOM|%1|%2|%3\n")
+        QString message = QString("CREATE_ROOM|%1|%2|%3|%4\n")
                               .arg(productName)
                               .arg(productStartingPrice)
-                              .arg(buyNow);
+                              .arg(buyNow)
+                              .arg(duration);
 
         // Gửi qua socket
         m_socket->write(message.toUtf8());
@@ -217,19 +224,27 @@ void MainWindow::onReadyRead()
         // Server: OK|JOINED|<id>|<name>|<price>
         else if (line.startsWith("OK|JOINED")) {
             QStringList parts = line.split('|');
-            if (parts.size() >= 5) {
-                m_currentRoomId = parts[2].toInt(); // Lưu ID phòng đang ở
+
+            // Server gửi: OK|JOINED|ID|Name|CurrentPrice|BuyNowPrice
+            // Tổng cộng là 6 phần (index 0 đến 5)
+            if (parts.size() >= 6) {
+                m_currentRoomId = parts[2].toInt();
                 QString name = parts[3];
                 QString price = parts[4];
+                QString buyNow = parts[5]; // <-- Lấy giá mua ngay
 
-                // Cập nhật UI trang Room
+                // Cập nhật UI
                 ui->lblRoomName->setText("Đang đấu giá: " + name);
                 ui->lblCurrentPrice->setText(price);
+
+                // --- HIỂN THỊ GIÁ MUA NGAY ---
+                ui->lblBuyNowPrice->setText("Giá mua ngay: " + buyNow);
+                // -----------------------------
+
                 ui->txtRoomLog->clear();
                 ui->txtRoomLog->append("--- Bắt đầu phiên đấu giá ---");
 
-                // Chuyển trang
-                ui->stackedWidget->setCurrentIndex(2); // Page Room
+                ui->stackedWidget->setCurrentIndex(2);
             }
         }
 
@@ -291,6 +306,19 @@ void MainWindow::onReadyRead()
 
             // Disable các nút để không bấm được nữa
             ui->btnBid->setEnabled(false);
+        }
+        else if (line.startsWith("ERR|INVALID_PRICE_CONFIG")) {
+            QMessageBox::critical(this, "Lỗi tạo phòng",
+                                  "Server từ chối: Giá mua ngay phải lớn hơn giá khởi điểm.");
+        }
+        else if (line.startsWith("ERR|PRICE_TOO_LOW")) {
+            QMessageBox::warning(this, "Đấu giá thất bại",
+                                 "Giá bạn đặt không hợp lệ!\n\n"
+                                 "Quy tắc: Bạn phải đặt giá cao hơn giá hiện tại ít nhất 10.000 VND.");
+
+            // (Tùy chọn) Reset lại ô nhập liệu cho sạch
+            ui->txtBidAmount->clear();
+            ui->txtBidAmount->setFocus();
         }
 
         // 3. XỬ LÝ KHÔNG AI MUA (CLOSED)
