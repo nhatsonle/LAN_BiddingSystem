@@ -153,7 +153,7 @@
          <string>Tên phòng</string>
         </property>
        </widget>
-       <widget class="QLCDNumber" name="lcdNumber">
+       <widget class="QLCDNumber" name="lcdTimer">
         <property name="geometry">
          <rect>
           <x>230</x>

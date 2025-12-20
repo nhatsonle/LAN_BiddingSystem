@@ -2,7 +2,7 @@
 #include <iostream>
 
 int RoomManager::createRoom(std::string itemName, int startPrice) {
-    std::lock_guard<std::mutex> lock(roomsMutex);
+    std::lock_guard<std::recursive_mutex> lock(roomsMutex);
     Room newRoom;
     newRoom.id = roomIdCounter++;
     newRoom.itemName = itemName;
@@ -20,7 +20,9 @@ int RoomManager::createRoom(std::string itemName, int startPrice) {
 }
 
 std::string RoomManager::getRoomList() {
-    std::lock_guard<std::mutex> lock(roomsMutex);
+    std::lock_guard<std::recursive_mutex> lock(roomsMutex);
+    // Debug: In ra xem server có bao nhiêu phòng ?
+    std::cout << "[DEBUG] Current rooms count: " << rooms.size() << std::endl;
     if (rooms.empty()) return "";
     
     std::string listStr = "";
@@ -31,7 +33,7 @@ std::string RoomManager::getRoomList() {
 }
 
 bool RoomManager::joinRoom(int roomId, SocketType clientSocket, std::string& outRoomInfo) {
-    std::lock_guard<std::mutex> lock(roomsMutex);
+    std::lock_guard<std::recursive_mutex> lock(roomsMutex);
     for (auto& r : rooms) {
         if (r.id == roomId) {
             r.participants.push_back(clientSocket);
@@ -44,7 +46,7 @@ bool RoomManager::joinRoom(int roomId, SocketType clientSocket, std::string& out
 }
 
 bool RoomManager::placeBid(int roomId, int amount, SocketType bidderSocket, std::string& outBroadcastMsg) {
-    std::lock_guard<std::mutex> lock(roomsMutex);
+    std::lock_guard<std::recursive_mutex> lock(roomsMutex);
     for (auto& r : rooms) {
         if (r.id == roomId) {
             // Kiểm tra: Nếu phòng đã đóng thì không cho bid
@@ -71,7 +73,7 @@ bool RoomManager::placeBid(int roomId, int amount, SocketType bidderSocket, std:
 }
 
 std::vector<SocketType> RoomManager::getParticipants(int roomId) {
-    std::lock_guard<std::mutex> lock(roomsMutex);
+    std::lock_guard<std::recursive_mutex> lock(roomsMutex);
     for (const auto& r : rooms) {
         if (r.id == roomId) {
             return r.participants;
@@ -81,7 +83,7 @@ std::vector<SocketType> RoomManager::getParticipants(int roomId) {
 }
 
 void RoomManager::updateTimers(BroadcastCallback callback) {
-    std::lock_guard<std::mutex> lock(roomsMutex); // Khóa lại để duyệt an toàn
+    std::lock_guard<std::recursive_mutex> lock(roomsMutex); // Khóa lại để duyệt an toàn
     
     for (auto& r : rooms) {
         if (r.isClosed) continue; // Phòng đóng rồi thì bỏ qua

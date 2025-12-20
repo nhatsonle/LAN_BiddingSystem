@@ -67,10 +67,18 @@ void MainWindow::on_btnLogin_clicked()
 
 void MainWindow::on_btnRefresh_clicked()
 {
-    // Gửi lệnh lấy danh sách phòng
-    m_socket->write("LIST_ROOMS\n");
-}
+    if (m_socket->state() == QAbstractSocket::ConnectedState) {
+        qDebug() << "Client: Sending LIST_ROOMS..."; // <--- THÊM DÒNG NÀY
 
+        // KIỂM TRA KỸ: Có ký tự xuống dòng \n ở cuối không?
+        m_socket->write("LIST_ROOMS\n");
+
+        // Nếu thiếu \n, Server (dùng getline hoặc buffer) có thể đợi mãi ký tự kết thúc dòng
+    } else {
+        qDebug() << "Client: Socket is NOT connected. State:" << m_socket->state();
+        QMessageBox::warning(this, "Lỗi", "Mất kết nối với Server!");
+    }
+}
 void MainWindow::on_btnLeave_clicked()
 {
     // Quay lại sảnh

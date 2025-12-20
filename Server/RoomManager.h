@@ -10,7 +10,7 @@
 class RoomManager {
 private:
     std::vector<Room> rooms;
-    std::mutex roomsMutex;
+    std::recursive_mutex roomsMutex;
     int roomIdCounter = 1;
 
     // Singleton: Constructor private
