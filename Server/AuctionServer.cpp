@@ -3,6 +3,8 @@
 #include <sstream>
 #include <algorithm>
 #include <cstring>
+#include <chrono>
+#include <thread>
 
 AuctionServer::AuctionServer(int port) : port(port) {
 }
@@ -27,6 +29,24 @@ void AuctionServer::start() {
         std::cerr << "Listen failed" << std::endl;
         return;
     }
+
+    // --- TẠO LUỒNG TIMER ---
+    std::thread timerThread([this]() {
+        while (true) {
+            // 1. Ngủ 1 giây
+            std::this_thread::sleep_for(std::chrono::seconds(1));
+            
+            // 2. Gọi Manager cập nhật và cung cấp hàm gửi tin (Lambda Function)
+            RoomManager::getInstance().updateTimers(
+                [this](int roomId, std::string msg) {
+                    // Đây là hàm callback: Manager nhờ Server gửi msg đến roomId
+                    this->broadcastToRoom(roomId, msg);
+                }
+            );
+        }
+    });
+    timerThread.detach(); // Cho chạy ngầm độc lập
+    // -----------------------
 
     std::cout << "=== SERVER STARTED ON PORT " << port << " ===" << std::endl;
 

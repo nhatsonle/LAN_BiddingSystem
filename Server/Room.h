@@ -4,13 +4,9 @@
 #include <string>
 #include <vector>
 
-// Định nghĩa kiểu Socket để tránh include lồng nhau phức tạp
-#ifdef _WIN32
-    #include <winsock2.h>
-    typedef SOCKET SocketType;
-#else
-    typedef int SocketType;
-#endif
+
+typedef int SocketType;
+
 
 struct Room {
     int id;
@@ -18,6 +14,9 @@ struct Room {
     int currentPrice;
     int highestBidderSocket; // Socket của người đang thắng (có thể đổi thành UserID sau này)
     std::vector<SocketType> participants; // Danh sách người đang xem
+    int timeLeft; // Thời gian còn lại để đấu giá (tính bằng giây)
+    bool isClosed;//Trạng thái phòng đấu giá
+    int initialDuration; // Thời gian đấu giá ban đầu (tính bằng giây)
 };
 
 #endif

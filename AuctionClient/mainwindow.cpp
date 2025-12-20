@@ -223,6 +223,46 @@ void MainWindow::onReadyRead()
                 qDebug() << "ERROR: Split size wrong! Check protocol separator.";
             }
         }
+        // 1. XỬ LÝ ĐỒNG HỒ ĐẾM NGƯỢC
+        // Server: TIME_UPDATE|299
+        else if (line.startsWith("TIME_UPDATE")) {
+            int seconds = line.section('|', 1, 1).toInt();
+
+            // Hiển thị lên LCD Number hoặc Label
+            ui->lcdTimer->display(seconds);
+
+            // Đổi màu nếu sắp hết giờ (< 30s)
+            if (seconds < 30) {
+                ui->lcdTimer->setStyleSheet("color: red;");
+            } else {
+                ui->lcdTimer->setStyleSheet("color: black;"); // Mặc định
+            }
+        }
+
+        // 2. XỬ LÝ KẾT THÚC PHIÊN (SOLD)
+        // Server: SOLD|<price>|<winner_socket>
+        else if (line.startsWith("SOLD")) {
+            QString price = line.section('|', 1, 1);
+            QString winner = line.section('|', 2, 2);
+
+            ui->lcdTimer->display(0);
+            ui->txtRoomLog->append("--- KẾT THÚC ---");
+            ui->txtRoomLog->append("Sản phẩm đã thuộc về User " + winner + " với giá " + price);
+
+            QMessageBox::information(this, "Kết thúc", "Sản phẩm đã được bán!");
+
+            // Disable các nút để không bấm được nữa
+            ui->btnBid->setEnabled(false);
+        }
+
+        // 3. XỬ LÝ KHÔNG AI MUA (CLOSED)
+        else if (line.startsWith("CLOSED")) {
+            ui->lcdTimer->display(0);
+            ui->txtRoomLog->append("--- KẾT THÚC ---");
+            ui->txtRoomLog->append("Không có ai đấu giá. Phiên bị hủy.");
+            ui->btnBid->setEnabled(false);
+        }
+
 }
 }
 

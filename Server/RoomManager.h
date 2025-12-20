@@ -4,6 +4,7 @@
 #include "Room.h"
 #include <vector>
 #include <mutex>
+#include <functional>
 #include <string>
 
 class RoomManager {
@@ -36,6 +37,11 @@ public:
 
     // Lấy danh sách socket trong phòng để gửi tin
     std::vector<SocketType> getParticipants(int roomId);
+    // Định nghĩa kiểu hàm Callback: Nhận vào roomID và nội dung tin nhắn
+    using BroadcastCallback = std::function<void(int roomId, std::string msg)>;
+
+    // Hàm cập nhật thời gian (Được gọi mỗi giây)
+    void updateTimers(BroadcastCallback callback);
 };
 
 #endif
