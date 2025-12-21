@@ -41,7 +41,12 @@ bool RoomManager::buyNow(int roomId, SocketType buyerSocket, std::string& outMsg
             // 2. Chuẩn bị tin nhắn SOLD (Tái sử dụng logic của Timer)
             // Format: SOLD|<price>|<winner_id>
             outMsg = "SOLD|" + std::to_string(r.buyNowPrice) + "|" + std::to_string(buyerSocket) + "\n";
-            
+            DatabaseManager::getInstance().saveAuctionResult(
+            r.id, 
+            r.itemName, 
+            r.currentPrice, 
+            std::to_string(r.highestBidderSocket) // Lưu ID người thắng
+        );
             return true;
         }
     }
@@ -186,6 +191,7 @@ void RoomManager::updateTimers(BroadcastCallback callback) {
                 // Lưu ý: r.highestBidderSocket hiện là Socket ID. 
                 // Nếu muốn đẹp bạn cần ánh xạ Socket -> Username (cần map<int, string> userMap)
                 // Tạm thời lưu Socket ID làm "Winner Name"
+                std::cout << "[INFO] Auction ended. Saving to DB..." << std::endl;
                 DatabaseManager::getInstance().saveAuctionResult(
                     r.id, 
                     r.itemName, 

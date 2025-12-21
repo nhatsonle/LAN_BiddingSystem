@@ -362,18 +362,29 @@ void MainWindow::onReadyRead()
 
 void MainWindow::on_txtSearch_textChanged(const QString &arg1)
 {
-    // Duyệt qua tất cả các dòng trong List danh sách phòng
+    // Lấy từ khóa người dùng đang nhập (arg1)
+    QString keyword = arg1.trimmed();
+
+    // Duyệt qua tất cả các dòng trong danh sách phòng
     for(int i = 0; i < ui->listRooms->count(); ++i)
     {
         QListWidgetItem* item = ui->listRooms->item(i);
         QString roomText = item->text();
-        // roomText có dạng: "Phòng 1: iPhone 15 - Giá: 2000"
+        // roomText ví dụ: "Phòng 1: iPhone 15 - Giá: 2000"
 
-        // Kiểm tra xem text có chứa từ khóa không (Case Insensitive - Không phân biệt hoa thường)
-        if(roomText.contains(arg1, Qt::CaseInsensitive)) {
-            item->setHidden(false); // Hiện
-        } else {
-            item->setHidden(true);  // Ẩn
+        // Logic lọc:
+        // 1. Nếu từ khóa rỗng -> Hiện hết
+        // 2. Nếu trong chuỗi có chứa từ khóa (Không phân biệt hoa thường) -> Hiện
+        // 3. Ngược lại -> Ẩn
+
+        if (keyword.isEmpty()) {
+            item->setHidden(false);
+        }
+        else if (roomText.contains(keyword, Qt::CaseInsensitive)) {
+            item->setHidden(false);
+        }
+        else {
+            item->setHidden(true);
         }
     }
 }

@@ -83,39 +83,59 @@ bool DatabaseManager::checkLogin(const std::string& username, const std::string&
 }
 
 void DatabaseManager::saveAuctionResult(int roomId, const std::string& itemName, int finalPrice, const std::string& winner) {
-    // Xây dựng câu lệnh SQL
+    char* zErrMsg = 0;
+    
+    // Thêm log để debug
+    std::cout << "[DB] Saving: " << itemName << " - Price: " << finalPrice << std::endl;
+
+    // CHÚ Ý DẤU NHÁY ĐƠN ' ' BAO QUANH CÁC BIẾN STRING
     std::string sql = "INSERT INTO history (room_id, item_name, final_price, winner) VALUES (" + 
                       std::to_string(roomId) + ", '" + 
-                      itemName + "', " + 
+                      itemName + "', " +             // <-- Có dấu ' ở trước và sau
                       std::to_string(finalPrice) + ", '" + 
-                      winner + "');";
+                      winner + "');";                 // <-- Có dấu ' ở trước và sau
 
-    char* zErrMsg = 0;
-    sqlite3_exec(db, sql.c_str(), 0, 0, &zErrMsg);
+    int rc = sqlite3_exec(db, sql.c_str(), 0, 0, &zErrMsg);
+    
+    if (rc != SQLITE_OK) {
+        // In lỗi ra màn hình để biết tại sao không lưu được
+        std::cerr << "[DB ERROR] SQL Error: " << zErrMsg << std::endl;
+        std::cerr << "[DB ERROR] Query was: " << sql << std::endl;
+        sqlite3_free(zErrMsg);
+    } else {
+        std::cout << "[DB] Saved successfully!" << std::endl;
+    }
 }
 
 // Callback helper
 static int historyCallback(void* data, int argc, char** argv, char** azColName) {
     std::string* list = (std::string*)data;
-    // argv[0]=item_name, argv[1]=final_price, argv[2]=winner, argv[3]=timestamp
-    if (argv[0] && argv[1] && argv[2]) {
-        // Format: Name:Price:Winner;
-        *list += std::string(argv[0]) + ":" + argv[1] + ":" + argv[2] + ";";
-    }
+    
+    // Kiểm tra null an toàn hơn
+    std::string name = (argv[0] ? argv[0] : "Unknown");
+    std::string price = (argv[1] ? argv[1] : "0");
+    std::string winner = (argv[2] ? argv[2] : "Unknown");
+
+    // Debug xem nó đọc được gì
+    std::cout << "[DB READ] Row: " << name << " - " << price << std::endl;
+
+    *list += name + ":" + price + ":" + winner + ";";
     return 0;
 }
 
 std::string DatabaseManager::getHistoryList() {
     std::string list = "";
-    // Lấy 10 giao dịch gần nhất
     std::string sql = "SELECT item_name, final_price, winner FROM history ORDER BY id DESC LIMIT 10;";
     
     char* zErrMsg = 0;
+    std::cout << "[DB] Executing: " << sql << std::endl; // Log
+
     int rc = sqlite3_exec(db, sql.c_str(), historyCallback, &list, &zErrMsg);
     
     if (rc != SQLITE_OK) {
-        std::cerr << "SQL History Error: " << zErrMsg << std::endl;
+        std::cerr << "[DB ERROR] Fetch History: " << zErrMsg << std::endl;
         sqlite3_free(zErrMsg);
     }
+    
     return list;
 }
