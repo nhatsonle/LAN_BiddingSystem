@@ -32,8 +32,7 @@ $(TARGET): $(OBJS)
 %.o: %.cpp
 	$(CXX) $(CXXFLAGS) -c $< -o $@
 
-# Rule 2: Biên dịch file .c thành .o bằng gcc (QUAN TRỌNG NHẤT)
-# Đây là dòng giúp sửa lỗi "invalid conversion" bạn đang gặp
+# Rule 2: Biên dịch file .c thành .o bằng gcc 
 %.o: %.c
 	$(CC) $(CFLAGS) -c $< -o $@
 

@@ -93,3 +93,29 @@ void DatabaseManager::saveAuctionResult(int roomId, const std::string& itemName,
     char* zErrMsg = 0;
     sqlite3_exec(db, sql.c_str(), 0, 0, &zErrMsg);
 }
+
+// Callback helper
+static int historyCallback(void* data, int argc, char** argv, char** azColName) {
+    std::string* list = (std::string*)data;
+    // argv[0]=item_name, argv[1]=final_price, argv[2]=winner, argv[3]=timestamp
+    if (argv[0] && argv[1] && argv[2]) {
+        // Format: Name:Price:Winner;
+        *list += std::string(argv[0]) + ":" + argv[1] + ":" + argv[2] + ";";
+    }
+    return 0;
+}
+
+std::string DatabaseManager::getHistoryList() {
+    std::string list = "";
+    // Lấy 10 giao dịch gần nhất
+    std::string sql = "SELECT item_name, final_price, winner FROM history ORDER BY id DESC LIMIT 10;";
+    
+    char* zErrMsg = 0;
+    int rc = sqlite3_exec(db, sql.c_str(), historyCallback, &list, &zErrMsg);
+    
+    if (rc != SQLITE_OK) {
+        std::cerr << "SQL History Error: " << zErrMsg << std::endl;
+        sqlite3_free(zErrMsg);
+    }
+    return list;
+}

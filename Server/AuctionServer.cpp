@@ -108,6 +108,7 @@ std::string AuctionServer::processCommand(SocketType clientSocket, const std::st
     }
     else if (cmd == "REGISTER") { // REGISTER|user|pass
         // Logic đăng ký
+        if (tokens.size() < 3) return "ERR|MISSING_ARGS";
         if (DatabaseManager::getInstance().registerUser(tokens[1], tokens[2])) {
             return "OK|REGISTER_SUCCESS";
         } else {
@@ -174,6 +175,10 @@ std::string AuctionServer::processCommand(SocketType clientSocket, const std::st
         } else {
             return "ERR|ROOM_NOT_FOUND_OR_NOT_IN";
         }
+    }
+    else if (cmd == "VIEW_HISTORY") {
+        std::string history = DatabaseManager::getInstance().getHistoryList();
+        return "OK|HISTORY|" + history;
     }
     // ...
     

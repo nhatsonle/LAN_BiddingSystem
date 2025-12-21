@@ -22,6 +22,8 @@ public:
 
     // Lưu lịch sử đấu giá
     void saveAuctionResult(int roomId, const std::string& itemName, int finalPrice, const std::string& winner);
+    // Hàm lấy chuỗi danh sách lịch sử: "ItemA:1000:User1;ItemB:2000:User2;"
+    std::string getHistoryList();
 
 private:
     sqlite3* db; // Con trỏ quản lý kết nối DB

@@ -162,6 +162,10 @@ void MainWindow::on_btnBuyNow_clicked()
     }
 }
 
+void MainWindow::on_btnHistory_clicked() {
+    m_socket->write("VIEW_HISTORY\n");
+}
+
 
 
 
@@ -320,6 +324,28 @@ void MainWindow::onReadyRead()
             ui->txtBidAmount->clear();
             ui->txtBidAmount->setFocus();
         }
+        else if (line.startsWith("ERR|LOGIN_FAILED")) {
+            QMessageBox::critical(this, "Đăng nhập thất bại",
+                                  "Tài khoản hoặc mật khẩu không chính xác!\n"
+                                  "Vui lòng kiểm tra lại hoặc Đăng ký mới.");
+        }
+        else if (line.startsWith("OK|HISTORY")) {
+            QString data = line.section('|', 2, 2); // Lấy phần dữ liệu sau OK|HISTORY|
+            QStringList items = data.split(';', Qt::SkipEmptyParts);
+
+            QString displayMsg = "=== CÁC PHIÊN ĐẤU GIÁ ĐÃ KẾT THÚC ===\n\n";
+            for (const QString& item : items) {
+                QStringList details = item.split(':');
+                if (details.size() >= 3) {
+                    displayMsg += QString("Vật phẩm: %1\nGiá chốt: %2 VND\nNgười thắng: %3\n----------------\n")
+                                      .arg(details[0], details[1], details[2]);
+                }
+            }
+
+            if (items.isEmpty()) displayMsg += "(Chưa có dữ liệu)";
+
+            QMessageBox::information(this, "Lịch sử đấu giá", displayMsg);
+        }
 
         // 3. XỬ LÝ KHÔNG AI MUA (CLOSED)
         else if (line.startsWith("CLOSED")) {
@@ -332,4 +358,23 @@ void MainWindow::onReadyRead()
 }
 }
 
+
+
+void MainWindow::on_txtSearch_textChanged(const QString &arg1)
+{
+    // Duyệt qua tất cả các dòng trong List danh sách phòng
+    for(int i = 0; i < ui->listRooms->count(); ++i)
+    {
+        QListWidgetItem* item = ui->listRooms->item(i);
+        QString roomText = item->text();
+        // roomText có dạng: "Phòng 1: iPhone 15 - Giá: 2000"
+
+        // Kiểm tra xem text có chứa từ khóa không (Case Insensitive - Không phân biệt hoa thường)
+        if(roomText.contains(arg1, Qt::CaseInsensitive)) {
+            item->setHidden(false); // Hiện
+        } else {
+            item->setHidden(true);  // Ẩn
+        }
+    }
+}
 

@@ -28,6 +28,9 @@ private slots:
     void on_btnCreateRoom_clicked();
     void on_btnBid_clicked();
     void on_btnBuyNow_clicked();
+    void on_btnHistory_clicked();
+    void on_txtSearch_textChanged(const QString &arg1);
+
 private:
     Ui::MainWindow *ui;
     QTcpSocket *m_socket; // Đối tượng quản lý kết nối
