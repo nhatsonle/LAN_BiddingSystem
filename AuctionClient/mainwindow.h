@@ -30,6 +30,9 @@ private slots:
     void on_btnBuyNow_clicked();
     void on_btnHistory_clicked();
     void on_txtSearch_textChanged(const QString &arg1);
+    void on_btnOpenRegister_clicked();
+
+    void on_cboSort_currentIndexChanged(int index);
 
 private:
     Ui::MainWindow *ui;

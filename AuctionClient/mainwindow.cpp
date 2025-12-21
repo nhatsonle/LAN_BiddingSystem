@@ -4,6 +4,8 @@
 #include <QMessageBox>
 #include <QTimer>
 #include <QDebug>
+#include <algorithm>
+#include "registerdialog.h"
 
 MainWindow::MainWindow(QWidget *parent)
     : QMainWindow(parent)
@@ -166,6 +168,31 @@ void MainWindow::on_btnHistory_clicked() {
     m_socket->write("VIEW_HISTORY\n");
 }
 
+void MainWindow::on_btnOpenRegister_clicked()
+{
+    RegisterDialog dlg(this);
+    if (dlg.exec() == QDialog::Accepted) {
+        QString u = dlg.getUsername();
+        QString p = dlg.getPassword();
+
+        // 1. KIỂM TRA VÀ TỰ ĐỘNG KẾT NỐI NẾU CẦN
+        if (m_socket->state() != QAbstractSocket::ConnectedState) {
+            // Thay "127.0.0.1" và 8080 bằng IP/Port server của bạn nếu khác
+            m_socket->connectToHost("127.0.0.1", 8080);
+
+            // Chờ tối đa 3 giây để kết nối
+            if (!m_socket->waitForConnected(3000)) {
+                QMessageBox::critical(this, "Lỗi kết nối",
+                                      "Không thể kết nối đến Server!\nVui lòng kiểm tra lại Server.");
+                return;
+            }
+        }
+
+        // 2. Gửi lệnh khi đã chắc chắn có kết nối
+        QString msg = "REGISTER|" + u + "|" + p + "\n";
+        m_socket->write(msg.toUtf8());
+    }
+}
 
 
 
@@ -207,14 +234,26 @@ void MainWindow::onReadyRead()
             QStringList rooms = data.split(';', Qt::SkipEmptyParts);
 
             for (const QString &r : rooms) {
-                QStringList parts = r.split(':'); // 1:Laptop:1500
+                QStringList parts = r.split(':'); // ID:Name:Price:BuyNow
                 if (parts.size() >= 3) {
-                    QString display = "Phòng " + parts[0] + ": " + parts[1] + " - Giá: " + parts[2];
-                    QListWidgetItem *item = new QListWidgetItem(display);
-                    // LƯU ID VÀO DỮ LIỆU ẨN CỦA ITEM
-                    item->setData(Qt::UserRole, parts[0].toInt());
+                    int rId = parts[0].toInt();
+                    QString name = parts[1];
+                    int price = parts[2].toInt();
+
+                    // Tạo text hiển thị
+                    QString displayText = QString("Phòng %1: %2 - Giá: %3 VND").arg(rId).arg(name).arg(price);
+
+                    // --- SỬA ĐOẠN TẠO ITEM ---
+                    QListWidgetItem* item = new QListWidgetItem(displayText);
+
+                    // 1. Lưu GIÁ vào ngăn chứa số 1 (UserRole + 1)
+                    item->setData(Qt::UserRole + 1, price);
+
+                    // 2. Lưu ID vào ngăn chứa số 2 (UserRole + 2) -> Dùng để xếp Mới nhất
+                    item->setData(Qt::UserRole + 2, rId);
 
                     ui->listRooms->addItem(item);
+                    // -------------------------
                 }
             }
         }
@@ -346,6 +385,16 @@ void MainWindow::onReadyRead()
 
             QMessageBox::information(this, "Lịch sử đấu giá", displayMsg);
         }
+        else if (line.startsWith("OK|REGISTER_SUCCESS")) {
+            QMessageBox::information(this, "Thành công",
+                                     "Đăng ký tài khoản thành công!\nBạn có thể đăng nhập ngay bây giờ.");
+        }
+        else if (line.startsWith("ERR|USER_EXISTS")) {
+            QMessageBox::critical(this, "Đăng ký thất bại",
+                                  "Tên đăng nhập này đã tồn tại.\nVui lòng chọn tên khác.");
+        }
+
+        // ...
 
         // 3. XỬ LÝ KHÔNG AI MUA (CLOSED)
         else if (line.startsWith("CLOSED")) {
@@ -386,6 +435,47 @@ void MainWindow::on_txtSearch_textChanged(const QString &arg1)
         else {
             item->setHidden(true);
         }
+    }
+}
+
+
+
+void MainWindow::on_cboSort_currentIndexChanged(int index)
+{
+    // 1. Lấy toàn bộ Item từ ListWidget ra một danh sách tạm
+    QList<QListWidgetItem*> items;
+    int count = ui->listRooms->count();
+    for (int i = 0; i < count; ++i) {
+        items.append(ui->listRooms->takeItem(0)); // Lấy ra và xóa khỏi UI
+    }
+
+    // 2. Định nghĩa logic sắp xếp dựa trên index của ComboBox
+    // Index 0: Mới nhất (ID giảm dần)
+    // Index 1: Giá tăng dần
+    // Index 2: Giá giảm dần
+
+    if (index == 0) {
+        // Sắp xếp theo ID (UserRole + 2) giảm dần (Phòng mới tạo ID sẽ to hơn)
+        std::sort(items.begin(), items.end(), [](QListWidgetItem* a, QListWidgetItem* b) {
+            return a->data(Qt::UserRole + 2).toInt() > b->data(Qt::UserRole + 2).toInt();
+        });
+    }
+    else if (index == 1) {
+        // Giá tăng dần (UserRole + 1)
+        std::sort(items.begin(), items.end(), [](QListWidgetItem* a, QListWidgetItem* b) {
+            return a->data(Qt::UserRole + 1).toInt() < b->data(Qt::UserRole + 1).toInt();
+        });
+    }
+    else if (index == 2) {
+        // Giá giảm dần
+        std::sort(items.begin(), items.end(), [](QListWidgetItem* a, QListWidgetItem* b) {
+            return a->data(Qt::UserRole + 1).toInt() > b->data(Qt::UserRole + 1).toInt();
+        });
+    }
+
+    // 3. Đưa các Item đã sắp xếp quay lại UI
+    for (QListWidgetItem* item : items) {
+        ui->listRooms->addItem(item);
     }
 }
 

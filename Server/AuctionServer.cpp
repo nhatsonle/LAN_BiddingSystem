@@ -106,13 +106,17 @@ std::string AuctionServer::processCommand(SocketType clientSocket, const std::st
             return "ERR|LOGIN_FAILED";
         }
     }
-    else if (cmd == "REGISTER") { // REGISTER|user|pass
-        // Logic đăng ký
+    else if (cmd == "REGISTER") { // Client gửi: REGISTER|user|pass
         if (tokens.size() < 3) return "ERR|MISSING_ARGS";
-        if (DatabaseManager::getInstance().registerUser(tokens[1], tokens[2])) {
+        
+        std::string u = tokens[1];
+        std::string p = tokens[2];
+
+        // Gọi DB
+        if (DatabaseManager::getInstance().registerUser(u, p)) {
             return "OK|REGISTER_SUCCESS";
         } else {
-            return "ERR|USER_EXISTS";
+            return "ERR|USER_EXISTS"; // Báo lỗi trùng tên
         }
     }
     else if (cmd == "CREATE_ROOM") { 

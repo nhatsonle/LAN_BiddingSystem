@@ -15,10 +15,10 @@
   </property>
   <widget class="QWidget" name="centralwidget">
    <layout class="QGridLayout" name="gridLayout">
-    <item row="0" column="1">
+    <item row="0" column="0">
      <widget class="QStackedWidget" name="stackedWidget">
       <property name="currentIndex">
-       <number>1</number>
+       <number>0</number>
       </property>
       <widget class="QWidget" name="Login">
        <widget class="QLineEdit" name="txtUser">
@@ -34,9 +34,9 @@
        <widget class="QLineEdit" name="txtPass">
         <property name="geometry">
          <rect>
-          <x>460</x>
+          <x>370</x>
           <y>160</y>
-          <width>113</width>
+          <width>131</width>
           <height>23</height>
          </rect>
         </property>
@@ -45,9 +45,9 @@
         <property name="geometry">
          <rect>
           <x>210</x>
-          <y>250</y>
-          <width>83</width>
-          <height>24</height>
+          <y>240</y>
+          <width>101</width>
+          <height>31</height>
          </rect>
         </property>
         <property name="text">
@@ -70,7 +70,7 @@
        <widget class="QLabel" name="label_3">
         <property name="geometry">
          <rect>
-          <x>460</x>
+          <x>370</x>
           <y>130</y>
           <width>121</width>
           <height>16</height>
@@ -78,6 +78,19 @@
         </property>
         <property name="text">
          <string>Password</string>
+        </property>
+       </widget>
+       <widget class="QPushButton" name="btnOpenRegister">
+        <property name="geometry">
+         <rect>
+          <x>370</x>
+          <y>240</y>
+          <width>101</width>
+          <height>31</height>
+         </rect>
+        </property>
+        <property name="text">
+         <string>Đăng ký</string>
         </property>
        </widget>
       </widget>
@@ -110,8 +123,8 @@
          <rect>
           <x>20</x>
           <y>430</y>
-          <width>83</width>
-          <height>24</height>
+          <width>91</width>
+          <height>31</height>
          </rect>
         </property>
         <property name="text">
@@ -123,9 +136,15 @@
          <rect>
           <x>140</x>
           <y>430</y>
-          <width>83</width>
-          <height>24</height>
+          <width>101</width>
+          <height>31</height>
          </rect>
+        </property>
+        <property name="styleSheet">
+         <string notr="true">QPushButton {
+    background-color: #27ae60;
+}
+QPushButton:hover { background-color: #219150; }</string>
         </property>
         <property name="text">
          <string>Làm mới DS</string>
@@ -136,8 +155,8 @@
          <rect>
           <x>260</x>
           <y>430</y>
-          <width>83</width>
-          <height>24</height>
+          <width>101</width>
+          <height>31</height>
          </rect>
         </property>
         <property name="text">
@@ -149,8 +168,8 @@
          <rect>
           <x>380</x>
           <y>430</y>
-          <width>83</width>
-          <height>24</height>
+          <width>101</width>
+          <height>31</height>
          </rect>
         </property>
         <property name="text">
@@ -275,6 +294,12 @@
           <height>24</height>
          </rect>
         </property>
+        <property name="styleSheet">
+         <string notr="true">QPushButton {
+    background-color: #e74c3c;
+}
+QPushButton:hover { background-color: #c0392b; }</string>
+        </property>
         <property name="text">
          <string>Rời phòng</string>
         </property>
@@ -287,6 +312,13 @@
           <width>83</width>
           <height>24</height>
          </rect>
+        </property>
+        <property name="styleSheet">
+         <string notr="true">QPushButton {
+    background-color: #e67e22;
+    font-size: 16px;
+}
+QPushButton:hover { background-color: #d35400; }</string>
         </property>
         <property name="text">
          <string>MUA NGAY</string>

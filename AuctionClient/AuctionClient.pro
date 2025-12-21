@@ -11,15 +11,18 @@ CONFIG += c++17
 SOURCES += \
     createroomdialog.cpp \
     main.cpp \
-    mainwindow.cpp
+    mainwindow.cpp \
+    registerdialog.cpp
 
 HEADERS += \
     createroomdialog.h \
-    mainwindow.h
+    mainwindow.h \
+    registerdialog.h
 
 FORMS += \
     createroomdialog.ui \
-    mainwindow.ui
+    mainwindow.ui \
+    registerdialog.ui
 
 # Default rules for deployment.
 qnx: target.path = /tmp/$${TARGET}/bin

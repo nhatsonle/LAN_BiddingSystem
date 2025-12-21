@@ -59,11 +59,12 @@ bool DatabaseManager::registerUser(const std::string& username, const std::strin
     int rc = sqlite3_exec(db, sql.c_str(), 0, 0, &zErrMsg);
     
     if (rc != SQLITE_OK) {
-        std::cerr << "Register Error: " << zErrMsg << std::endl;
+        // Log lỗi để debug
+        std::cerr << "[DB REGISTER ERROR]: " << zErrMsg << std::endl;
         sqlite3_free(zErrMsg);
-        return false; // Có thể do trùng username
+        return false; // Trả về False nếu trùng tên hoặc lỗi SQL
     }
-    return true;
+    return true; // Thành công
 }
 
 bool DatabaseManager::checkLogin(const std::string& username, const std::string& password) {
