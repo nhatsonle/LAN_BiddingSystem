@@ -3,21 +3,36 @@
 
 #include <string>
 #include <vector>
-
+#include <queue>
 
 typedef int SocketType;
+// 1. Định nghĩa cấu trúc Sản phẩm
+struct Product {
+    std::string name;
+    int startPrice;
+    int buyNowPrice;
+    int duration;
+};
 
-
+// 2. Cập nhật cấu trúc Room
 struct Room {
     int id;
+    
+    // --- THÔNG TIN SẢN PHẨM ĐANG ĐẤU GIÁ (ACTIVE) ---
     std::string itemName;
     int currentPrice;
-    int highestBidderSocket; // Socket của người đang thắng (có thể đổi thành UserID sau này)
-    std::vector<SocketType> participants; // Danh sách người đang xem
-    int timeLeft; // Thời gian còn lại để đấu giá (tính bằng giây)
-    bool isClosed;//Trạng thái phòng đấu giá
-    int initialDuration; // Thời gian đấu giá ban đầu (tính bằng giây)
-    int buyNowPrice; // Giá mua ngay
+    int buyNowPrice;
+    int highestBidderSocket;
+    int timeLeft;
+    int initialDuration;
+    // ------------------------------------------------
+    
+    bool isClosed;
+    std::vector<SocketType>participants; // Dùng int thay vì SocketType cho đơn giản hóa struct
+    
+    // --- THÊM HÀNG CHỜ ---
+    std::queue<Product> productQueue; // Hàng đợi các sản phẩm tiếp theo
+    // ---------------------
 };
 
 #endif

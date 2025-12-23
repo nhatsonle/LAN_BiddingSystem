@@ -110,45 +110,66 @@ void MainWindow::on_btnLeave_clicked()
 void MainWindow::on_btnCreateRoom_clicked()
 {
     CreateRoomDialog dlg(this);
-
     if (dlg.exec() == QDialog::Accepted) {
+        QString roomName = dlg.getRoomName();
+        auto products = dlg.getProductList();
 
-        QString productName = dlg.productName();
-        QString productStartingPrice = dlg.productStartingPrice();
-        QString buyNow = dlg.productBuyNowPrice();
-        QString duration = dlg.auctionDuration();
-
-        // Validate tối thiểu
-        if (productName.isEmpty()) {
-            QMessageBox::warning(this, "Lỗi", "Tên phòng không được trống");
-            return;
+        // Xây dựng chuỗi danh sách sản phẩm
+        // Ví dụ: "iPhone,1000,2000,60;TaiNghe,500,1000,30"
+        QStringList productStrings;
+        for (const auto& p : products) {
+            QString itemStr = QString("%1,%2,%3,%4")
+            .arg(p.name)
+                .arg(p.startPrice)
+                .arg(p.buyNowPrice)
+                .arg(p.duration);
+            productStrings << itemStr;
         }
 
-        // Build message theo protocol
-        QString message = QString("CREATE_ROOM|%1|%2|%3|%4\n")
-                              .arg(productName)
-                              .arg(productStartingPrice)
-                              .arg(buyNow)
-                              .arg(duration);
+        // Gửi lệnh: CREATE_ROOM|RoomName|ProductListString
+        QString msg = QString("CREATE_ROOM|%1|%2\n")
+                          .arg(roomName)
+                          .arg(productStrings.join(";")); // Nối các SP bằng dấu chấm phẩy
 
-        // Gửi qua socket
-        m_socket->write(message.toUtf8());
+        m_socket->write(msg.toUtf8());
     }
 }
 
-void MainWindow::on_btnJoin_clicked(){
-    // Lấy item đang được chọn
-    QListWidgetItem *current = ui->listRooms->currentItem();
-    if (!current) {
-        QMessageBox::warning(this, "Chú ý", "Vui lòng chọn một phòng để tham gia!");
+void MainWindow::on_btnJoin_clicked()
+{
+    // 1. Lấy dòng đang chọn
+    QListWidgetItem *item = ui->listRooms->currentItem();
+    if (!item) {
+        QMessageBox::warning(this, "Lỗi", "Vui lòng chọn một phòng!");
         return;
     }
 
-    // Lấy ID từ dữ liệu ẩn
-    int roomId = current->data(Qt::UserRole).toInt();
+    // 2. Lấy ID từ dữ liệu ẩn
+    int roomId = item->data(Qt::UserRole + 2).toInt();
 
-    // Gửi lệnh JOIN
-    m_socket->write(QString("JOIN_ROOM|%1\n").arg(roomId).toUtf8());
+    // Debug ngay lập tức
+    qDebug() << "[DEBUG] Dang chon phong ID:" << roomId;
+
+    // 3. Nếu vẫn bằng 0 -> Có thể do chưa cập nhật danh sách
+    if (roomId == 0) {
+        QMessageBox::critical(this, "Lỗi logic",
+                              "Không lấy được ID phòng (ID=0).\nHãy ấn nút 'Làm mới' để tải lại danh sách.");
+        return;
+    }
+
+    // 4. Gửi lệnh Join
+    if (m_socket->state() == QAbstractSocket::ConnectedState) {
+        m_currentRoomId = roomId;
+
+        // Gửi lệnh JOIN_ROOM|ID
+        QString msg = "JOIN_ROOM|" + QString::number(roomId) + "\n";
+        m_socket->write(msg.toUtf8());
+
+        // Log lại lệnh đã gửi
+        qDebug() << "[DEBUG] Sending:" << msg;
+    } else {
+        QMessageBox::warning(this, "Lỗi", "Mất kết nối Server!");
+    }
 }
 
 void MainWindow::on_btnBuyNow_clicked()
@@ -228,32 +249,46 @@ void MainWindow::onReadyRead()
         // 2. Phản hồi Danh sách phòng
         // Server gửi: OK|LIST|1:Laptop:1500;2:Phone:500;
         else if (line.startsWith("OK|LIST")) {
-            ui->listRooms->clear();
+            ui->listRooms->clear(); // Đảm bảo tên widget đúng là lstRooms hoặc listRooms
 
-            QString data = line.section('|', 2, 2); // Lấy phần sau OK|LIST|
-            QStringList rooms = data.split(';', Qt::SkipEmptyParts);
+            // 1. Lấy phần dữ liệu thực tế (Bỏ qua "OK|LIST|")
+            // section('|', 2) sẽ lấy tất cả nội dung từ sau dấu gạch đứng thứ 2 trở đi
+            QString data = line.section('|', 2);
 
-            for (const QString &r : rooms) {
-                QStringList parts = r.split(':'); // ID:Name:Price:BuyNow
-                if (parts.size() >= 3) {
-                    int rId = parts[0].toInt();
+            // Debug xem dữ liệu thô sau khi cắt header là gì
+            qDebug() << "[DEBUG] List Data Raw:" << data;
+
+            QStringList rooms = data.split('\n', Qt::SkipEmptyParts);
+
+            for (const QString& roomStr : rooms) {
+                // Format từng dòng: ID:Name:Price:BuyNow
+                QStringList parts = roomStr.split(':');
+
+                // Phải có ít nhất 2 phần tử (ID và Name)
+                if (parts.size() >= 2) {
+                    bool ok;
+                    int rId = parts[0].toInt(&ok); // Convert ID
+
+                    if (!ok) {
+                        qDebug() << "[ERROR] ID không phải số:" << parts[0];
+                        continue;
+                    }
+
                     QString name = parts[1];
-                    int price = parts[2].toInt();
+                    QString price = (parts.size() >= 3) ? parts[2] : "0";
 
-                    // Tạo text hiển thị
-                    QString displayText = QString("Phòng %1: %2 - Giá: %3 VND").arg(rId).arg(name).arg(price);
-
-                    // --- SỬA ĐOẠN TẠO ITEM ---
+                    QString displayText = QString("Phòng %1: %2 - Giá: %3").arg(rId).arg(name).arg(price);
                     QListWidgetItem* item = new QListWidgetItem(displayText);
 
-                    // 1. Lưu GIÁ vào ngăn chứa số 1 (UserRole + 1)
-                    item->setData(Qt::UserRole + 1, price);
-
-                    // 2. Lưu ID vào ngăn chứa số 2 (UserRole + 2) -> Dùng để xếp Mới nhất
-                    item->setData(Qt::UserRole + 2, rId);
+                    // --- QUAN TRỌNG: LƯU ID VÀO DỮ LIỆU ẨN ---
+                    // Đây là chìa khóa để nút JOIN hoạt động đúng
+                    item->setData(Qt::UserRole + 1, price.toInt()); // Sort giá
+                    item->setData(Qt::UserRole + 2, rId);           // Lấy ID khi Join
+                    // ------------------------------------------
 
                     ui->listRooms->addItem(item);
-                    // -------------------------
+
+                    qDebug() << "[SUCCESS] Đã thêm phòng ID:" << rId;
                 }
             }
         }
@@ -393,8 +428,45 @@ void MainWindow::onReadyRead()
             QMessageBox::critical(this, "Đăng ký thất bại",
                                   "Tên đăng nhập này đã tồn tại.\nVui lòng chọn tên khác.");
         }
-
         // ...
+        else if (line.startsWith("NEXT_ITEM")) {
+            // Server: NEXT_ITEM|Name|Price|BuyNow|Duration
+            QStringList parts = line.split('|');
+            if (parts.size() >= 5) {
+                QString newName = parts[1];
+                QString newPrice = parts[2];
+                QString newBuyNow = parts[3];
+                int newDuration = parts[4].toInt();
+
+                // 1. Cập nhật UI
+                ui->lblRoomName->setText("Đang đấu giá: " + newName);
+                ui->lblCurrentPrice->setText(newPrice);
+                ui->lblBuyNowPrice->setText("Mua ngay: " + newBuyNow);
+                ui->lcdTimer->display(newDuration);
+
+                // 2. Thông báo chuyển đổi
+                ui->txtRoomLog->append("\n------------------------------");
+                ui->txtRoomLog->append(">>> CHUYỂN SANG SẢN PHẨM TIẾP THEO <<<");
+                ui->txtRoomLog->append("Sản phẩm: " + newName);
+                ui->txtRoomLog->append("Giá khởi điểm: " + newPrice);
+
+                // 3. Reset các nút (nếu bị disable do sold trước đó)
+                ui->btnBid->setEnabled(true);
+                ui->btnBuyNow->setEnabled(true);
+
+                // 4. Reset style đồng hồ về màu đen (nếu đang đỏ)
+                ui->lcdTimer->setStyleSheet("color: black;");
+
+                QMessageBox::information(this, "Thông báo", "Sản phẩm tiếp theo: " + newName);
+            }
+        }
+        else if (line.startsWith("SOLD_ITEM")) {
+            // Chỉ hiện thông báo text, KHÔNG disable nút vì còn sản phẩm sau
+            QStringList parts = line.split('|');
+            ui->txtRoomLog->append("!!! KẾT THÚC: " + parts[1] + " thuộc về User " + parts[3]);
+        }
+        // ...
+
 
         // 3. XỬ LÝ KHÔNG AI MUA (CLOSED)
         else if (line.startsWith("CLOSED")) {

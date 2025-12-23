@@ -1,19 +1,28 @@
 #ifndef ROOMMANAGER_H
 #define ROOMMANAGER_H
 
-#include "Room.h"
-#include <vector>
-#include <mutex>
-#include <functional>
 #include <string>
+#include <vector>
+#include <queue>
+#include <mutex>
+#include <iostream>
+#include <functional> // <--- BẮT BUỘC PHẢI CÓ THƯ VIỆN NÀY
+#include "Room.h" // Chứa struct Room và Product
+
+// --- 1. ĐỊNH NGHĨA CALLBACK & SOCKET ---
+// Định nghĩa SocketType là int 
+using SocketType = int;
+
+// Định nghĩa kiểu hàm Callback: Trả về void, nhận vào (int roomId, string message)
+using BroadcastCallback = std::function<void(int, std::string)>;
 
 class RoomManager {
 private:
     std::vector<Room> rooms;
     std::recursive_mutex roomsMutex;
     int roomIdCounter = 1;
-
-    // Singleton: Constructor private
+    bool loadNextProduct(Room& r);
+        // Singleton: Constructor private
     RoomManager() {} 
 
 public:
@@ -22,16 +31,16 @@ public:
         static RoomManager instance;
         return instance;
     }
+    std::string getRoomList();
 
     // Xóa copy constructor
     RoomManager(const RoomManager&) = delete;
     void operator=(const RoomManager&) = delete;
 
     // Các hàm nghiệp vụ
-    int createRoom(std::string itemName, int startPrice, int buyNowPrice, int duration);    std::string getRoomList();
+    int createRoom(std::string roomName, std::vector<Product> products);    
     bool joinRoom(int roomId, SocketType clientSocket, std::string& outRoomInfo);
-    bool buyNow(int roomId, SocketType buyerSocket, std::string& outMsg);
-    // Hàm xử lý Bid: Trả về true nếu thành công, cập nhật broadcastMsg
+    bool buyNow(int roomId, SocketType buyerSocket, std::string& outMsg, BroadcastCallback callback);    // Hàm xử lý Bid: Trả về true nếu thành công, cập nhật broadcastMsg
     bool placeBid(int roomId, int amount, SocketType bidderSocket, std::string& outBroadcastMsg);
     bool leaveRoom(int roomId, SocketType clientSocket);
     // Lấy danh sách socket trong phòng để gửi tin

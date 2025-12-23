@@ -5,6 +5,7 @@
 #include <cstring>
 #include <chrono>
 #include <thread>
+#include <sstream>
 #include "DatabaseManager.h"
 
 AuctionServer::AuctionServer(int port) : port(port) {
@@ -13,6 +14,16 @@ AuctionServer::AuctionServer(int port) : port(port) {
 AuctionServer::~AuctionServer() {
 }
 
+
+std::vector<std::string> split(const std::string& s, char delimiter) {
+    std::vector<std::string> tokens;
+    std::string token;
+    std::istringstream tokenStream(s);
+    while (std::getline(tokenStream, token, delimiter)) {
+        tokens.push_back(token);
+    }
+    return tokens;
+}
 
 void AuctionServer::start() {
     // 1. Tạo Socket & Bind (Code cũ của bạn)
@@ -119,30 +130,71 @@ std::string AuctionServer::processCommand(SocketType clientSocket, const std::st
             return "ERR|USER_EXISTS"; // Báo lỗi trùng tên
         }
     }
-    else if (cmd == "CREATE_ROOM") { 
-        // Format: CREATE_ROOM|Name|StartPrice|BuyNowPrice|Duration
-        if (tokens.size() < 5) return "ERR|MISSING_ARGS"; // Cần 5 tham số
+    else if (cmd == "CREATE_ROOM") {
+        // Format: CREATE_ROOM|RoomName|Item1,10,20,30;Item2,5,10,20
+        if (tokens.size() < 3) return "ERR|MISSING_ARGS";
         
-        int startP = std::stoi(tokens[2]);
-        int buyNowP = std::stoi(tokens[3]);
-        int duration = std::stoi(tokens[4]); // Đọc tham số thứ 5
+        std::string roomName = tokens[1];
+        std::string allProductsStr = tokens[2]; // Chuỗi dài chứa tất cả SP
         
-        // Gọi hàm với tham số duration
-        int newId = RoomManager::getInstance().createRoom(tokens[1], startP, buyNowP, duration);
+        std::vector<Product> productList;
         
-        if (newId == -1) return "ERR|INVALID_PRICE_CONFIG";
+        // 1. Tách các sản phẩm bằng dấu chấm phẩy ';'
+        std::vector<std::string> items = split(allProductsStr, ';');
+        
+        for (const std::string& itemStr : items) {
+            // 2. Tách chi tiết từng sản phẩm bằng dấu phẩy ','
+            // Format: Name,Start,BuyNow,Duration
+            std::vector<std::string> details = split(itemStr, ',');
+            
+            if (details.size() >= 4) {
+                Product p;
+                p.name = details[0];
+                try {
+                    p.startPrice = std::stoi(details[1]);
+                    p.buyNowPrice = std::stoi(details[2]);
+                    p.duration = std::stoi(details[3]);
+                    
+                    // Logic validate cơ bản
+                    if (p.buyNowPrice > p.startPrice) {
+                        productList.push_back(p);
+                    }
+                } catch (...) {
+                    continue; // Bỏ qua nếu lỗi format số
+                }
+            }
+        }
+        
+        if (productList.empty()) return "ERR|NO_VALID_PRODUCTS";
 
+        // Gọi Manager tạo phòng
+        int newId = RoomManager::getInstance().createRoom(roomName, productList);
         return "OK|ROOM_CREATED|" + std::to_string(newId);
     }
-    else if (cmd == "BUY_NOW") { // Cú pháp: BUY_NOW|<room_id>
+    else if (cmd == "BUY_NOW") {
+        if (tokens.size() < 2) return "ERR|MISSING_ARGS";
         int rId = std::stoi(tokens[1]);
         std::string broadcastMsg;
+
+        // --- SỬA ĐOẠN NÀY ---
         
-        if (RoomManager::getInstance().buyNow(rId, clientSocket, broadcastMsg)) {
-            broadcastToRoom(rId, broadcastMsg); // Gửi SOLD cho cả phòng
-            return "OK|BUY_NOW_SUCCESS";
+        // 1. Tạo một lambda function để làm callback broadcast
+        // Lambda này sẽ gọi hàm broadcast() của AuctionServer
+        auto broadcastFunc = [this](int roomId, std::string msg) {
+            this->broadcastToRoom(roomId, msg);
+        };
+
+        // 2. Gọi hàm buyNow với 4 tham số (tham số cuối là broadcastFunc)
+        bool success = RoomManager::getInstance().buyNow(rId, clientSocket, broadcastMsg, broadcastFunc);
+        
+        // --------------------
+
+        if (success) {
+            // Server tự broadcast kết quả bên trong RoomManager rồi, 
+            // ở đây chỉ cần trả về OK cho người mua
+            return "OK|BUY_SUCCESS"; 
         } else {
-            return "ERR|CANNOT_BUY_NOW";
+            return "ERR|BUY_FAILED";
         }
     }
     else if (cmd == "LIST_ROOMS") {
