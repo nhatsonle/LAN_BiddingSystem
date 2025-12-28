@@ -1,0 +1,25 @@
+# Server build outputs
+Server/*.o
+Server/*.a
+Server/server
+
+# Local SQLite database
+Server/auction_system.db
+
+# Client build outputs and generated headers
+AuctionClient/AuctionClient
+AuctionClient/*.o
+AuctionClient/*.a
+AuctionClient/moc_predefs.h
+AuctionClient/moc_*.cpp
+AuctionClient/ui_*.h
+AuctionClient/qrc_*.cpp
+AuctionClient/.qmake.cache
+AuctionClient/.qmake.stash
+
+# IDE/user-specific files
+*.swp
+*.swo
+*.user
+*.pro.user*
+*.qbs.user*

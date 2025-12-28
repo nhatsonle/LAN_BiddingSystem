@@ -222,6 +222,16 @@ std::string AuctionServer::processCommand(SocketType clientSocket, const std::st
             return "ERR|PRICE_TOO_LOW";
         }
     }
+    else if (cmd == "CHAT") { // CHAT|ID|Message
+        if (tokens.size() < 3) return "ERR|MISSING_ARGS";
+        int rId = std::stoi(tokens[1]);
+        std::string chatMsg = tokens[2];
+
+        // Broadcast chat (hiện tại gắn nhãn bằng socket id người gửi)
+        std::string broadcastMsg = "CHAT|" + std::to_string(clientSocket) + "|" + chatMsg + "\n";
+        broadcastToRoom(rId, broadcastMsg);
+        return "OK|CHAT_SENT";
+    }
     else if (cmd == "LEAVE_ROOM") { // Client gửi: LEAVE_ROOM|<room_id>
         if (tokens.size() < 2) return "ERR|MISSING_ARGS";
         
