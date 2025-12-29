@@ -36,15 +36,15 @@ The system is organized into three logical layers:
 
 ## 📂 Directory Structure
 
-Server/
-├── main.cpp # Entry point: initializes database and server
-├── AuctionServer.h/.cpp # Network layer: socket handling and client threads
-├── RoomManager.h/.cpp # Business logic: rooms, bidding, timers
-├── DatabaseManager.h/.cpp # Data layer: SQL operations (login, register, history)
-├── Room.h # Data models: Room, Product, SoldItem
-├── sqlite3.c / sqlite3.h # SQLite amalgamation source
-├── auction_system.db # SQLite database (auto-generated)
-└── Makefile # Build configuration
+### Server/
+- main.cpp # Entry point: initializes database and server
+- AuctionServer.h/.cpp # Network layer: socket handling and client threads
+- RoomManager.h/.cpp # Business logic: rooms, bidding, timers
+- DatabaseManager.h/.cpp # Data layer: SQL operations (login, register, history)
+- Room.h # Data models: Room, Product, SoldItem
+- sqlite3.c / sqlite3.h # SQLite amalgamation source
+- auction_system.db # SQLite database (auto-generated)
+- Makefile # Build configuration
 
 
 ---
@@ -65,7 +65,7 @@ Server/
 
 ```bash
 make
-
+```
 This command compiles:
 - C source (sqlite3.c)
 - C++ server source files
@@ -73,7 +73,7 @@ This command compiles:
 ### Run the Server
 - **Linux**
 ```bash
-./server
+./server    # Run the server
 ```
 The server listens on port 8080 by default.
 
@@ -87,14 +87,15 @@ The server uses a simple text-based protocol for communication with clients. Eac
 
 ### Supported Commands
 
-| Function     | Client Request | Server Response |           |              |                     |               |
-| -------  | ----- | -------------- | --------------- | --------- | ------------ | ------------------- | ------------- |
-| Login        | `LOGIN         | username        | password` | `OK          | LOGIN_SUCCESS`/`ERR | LOGIN_FAILED` |
-| Register     | `REGISTER      | username        | password` | `OK          | REGISTER_SUCCESS`   |               |
-| Create Room  | `CREATE_ROOM   | RoomName`       | `OK       | ROOM_CREATED | RoomID`             |               |
-| Join Room    | `JOIN_ROOM     | RoomID`         | `OK       | JOINED`      |                     |               |
-| Bid          | `BID           | RoomID          | Amount`   | `OK          | BID_ACCEPTED`       |               |
-| Get Products | `GET_PRODUCTS  | RoomID`         | `OK       | PRODUCT_LIST | ...`                |               |
+| Function     | Client Request                     | Server Response                    |
+|--------------|------------------------------------|------------------------------------|
+| Login        | `LOGIN|username|password`          | `OK|LOGIN_SUCCESS` / `ERR|LOGIN_FAILED` |
+| Register     | `REGISTER|username|password`       | `OK|REGISTER_SUCCESS`              |
+| Create Room  | `CREATE_ROOM|RoomName`             | `OK|ROOM_CREATED|RoomID`           |
+| Join Room    | `JOIN_ROOM|RoomID`                 | `OK|JOINED`                        |
+| Bid          | `BID|RoomID|Amount`                | `OK|BID_ACCEPTED`                  |
+| Get Products | `GET_PRODUCTS|RoomID`              | `OK|PRODUCT_LIST|...`              |
+               |               |
 
 ## Extending the System
 ### Example: Add Kick User Feature
