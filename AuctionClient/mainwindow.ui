@@ -281,8 +281,8 @@ QPushButton:hover { background-color: #219150; }</string>
          <rect>
           <x>50</x>
           <y>250</y>
-          <width>256</width>
-          <height>192</height>
+          <width>260</width>
+          <height>220</height>
          </rect>
         </property>
        </widget>
@@ -374,7 +374,7 @@ QPushButton:hover { background-color: #d35400; }</string>
          <string>Giá mua ngay</string>
         </property>
        </widget>
-      </widget>
+      <widget class="QLineEdit" name="txtChatInput"><property name="geometry"><rect><x>330</x><y>400</y><width>200</width><height>25</height></rect></property><property name="placeholderText"><string>Nhập tin nhắn...</string></property></widget><widget class="QPushButton" name="btnSendChat"><property name="geometry"><rect><x>540</x><y>397</y><width>90</width><height>31</height></rect></property><property name="text"><string>Gửi chat</string></property></widget><widget class="QTextBrowser" name="txtChatLog"><property name="geometry"><rect><x>330</x><y>250</y><width>300</width><height>130</height></rect></property></widget></widget>
      </widget>
     </item>
    </layout>

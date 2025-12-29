@@ -99,6 +99,7 @@ void MainWindow::on_btnLeave_clicked()
 
     // Xóa log chat cũ để lần sau vào phòng khác không bị lẫn lộn
     ui->txtRoomLog->clear();
+    ui->txtChatLog->clear();
 
     // (Tùy chọn) Reset ID phòng hiện tại
     m_currentRoomId = -1;
@@ -187,6 +188,22 @@ void MainWindow::on_btnBuyNow_clicked()
 
 void MainWindow::on_btnHistory_clicked() {
     m_socket->write("VIEW_HISTORY\n");
+}
+
+void MainWindow::on_btnSendChat_clicked()
+{
+    if (m_socket->state() != QAbstractSocket::ConnectedState) return;
+    if (m_currentRoomId < 0) return;
+
+    QString chatText = ui->txtChatInput->text().trimmed();
+    if (chatText.isEmpty()) return;
+
+    // Loại bỏ newline và ký tự '|' để tránh cắt gói/protocol
+    chatText.replace("\n", " ");
+    chatText.replace("|", " ");
+    QString cmd = QString("CHAT|%1|%2\n").arg(m_currentRoomId).arg(chatText);
+    m_socket->write(cmd.toUtf8());
+    ui->txtChatInput->clear();
 }
 
 void MainWindow::on_btnOpenRegister_clicked()
@@ -319,11 +336,13 @@ void MainWindow::onReadyRead()
                 ui->lblCurrentPrice->setText(price);
 
                 // --- HIỂN THỊ GIÁ MUA NGAY ---
-                ui->lblBuyNowPrice->setText("Giá mua ngay: " + buyNow);
+                ui->lblBuyNowPrice->setText(buyNow);
                 // -----------------------------
 
                 ui->txtRoomLog->clear();
                 ui->txtRoomLog->append("--- Bắt đầu phiên đấu giá ---");
+                ui->txtChatLog->clear();
+                ui->txtChatLog->append("=== Chat phòng ===");
 
                 ui->stackedWidget->setCurrentIndex(2);
             }
@@ -355,6 +374,15 @@ void MainWindow::onReadyRead()
                 qDebug() << "4. UI Updated successfully!";
             } else {
                 qDebug() << "ERROR: Split size wrong! Check protocol separator.";
+            }
+        }
+        else if (line.startsWith("CHAT")) {
+            // Server: CHAT|<socket>|<message>
+            QStringList parts = line.split('|');
+            if (parts.size() >= 3) {
+                QString sender = parts[1];
+                QString message = parts[2];
+                ui->txtChatLog->append("Chat " + sender + ": " + message);
             }
         }
         // 1. XỬ LÝ ĐỒNG HỒ ĐẾM NGƯỢC

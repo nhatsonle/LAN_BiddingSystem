@@ -33,6 +33,7 @@ private slots:
     void on_btnOpenRegister_clicked();
 
     void on_cboSort_currentIndexChanged(int index);
+    void on_btnSendChat_clicked();
 
 private:
     Ui::MainWindow *ui;
