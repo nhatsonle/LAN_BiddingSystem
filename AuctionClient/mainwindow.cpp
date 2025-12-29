@@ -336,7 +336,7 @@ void MainWindow::onReadyRead()
                 ui->lblCurrentPrice->setText(price);
 
                 // --- HIỂN THỊ GIÁ MUA NGAY ---
-                ui->lblBuyNowPrice->setText("Giá mua ngay: " + buyNow);
+                ui->lblBuyNowPrice->setText(buyNow);
                 // -----------------------------
 
                 ui->txtRoomLog->clear();
