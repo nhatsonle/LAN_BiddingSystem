@@ -88,6 +88,7 @@ std::string AuctionServer::processCommand(SocketType clientSocket,
 
     // GỌI DB ĐỂ CHECK
     if (DatabaseManager::getInstance().checkLogin(u, p)) {
+      RoomManager::getInstance().loginUser(clientSocket, u);
       return "OK|LOGIN_SUCCESS|Welcome " + u;
     } else {
       return "ERR|LOGIN_FAILED";
@@ -213,7 +214,9 @@ std::string AuctionServer::processCommand(SocketType clientSocket,
       return "ERR|ROOM_NOT_FOUND_OR_NOT_IN";
     }
   } else if (cmd == "VIEW_HISTORY") {
-    std::string history = DatabaseManager::getInstance().getHistoryList();
+    std::string username = RoomManager::getInstance().getUsername(clientSocket);
+    std::string history =
+        DatabaseManager::getInstance().getHistoryList(username);
     return "OK|HISTORY|" + history;
   } else if (cmd == "LOGOUT") {
     return "OK|LOGOUT_SUCCESS";

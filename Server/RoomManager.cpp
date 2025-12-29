@@ -80,9 +80,17 @@ bool RoomManager::buyNow(int roomId, SocketType buyerSocket,
       }
 
       // Lưu vào Database
+      // Lấy danh sách người tham gia (Username)
+      std::vector<std::string> participants;
+      for (auto s : r.participants) {
+        if (userMap.count(s))
+          participants.push_back(userMap[s]);
+      }
+
+      // Lưu vào Database
       DatabaseManager::getInstance().saveAuctionResult(
           r.id, r.itemName, r.currentPrice,
-          std::to_string(r.highestBidderSocket));
+          std::to_string(r.highestBidderSocket), participants);
 
       // --- PHẦN 2: XỬ LÝ HÀNG CHỜ (QUEUE) ---
       // Lưu ý: Đừng set r.isClosed = true vội, phải check hàng đã.
@@ -199,6 +207,13 @@ std::vector<SocketType> RoomManager::getParticipants(int roomId) {
 void RoomManager::removeClient(SocketType clientSocket) {
   std::lock_guard<std::recursive_mutex> lock(roomsMutex);
 
+  // Xóa khỏi userMap
+  if (userMap.count(clientSocket)) {
+    std::cout << "[INFO] User " << userMap[clientSocket] << " disconnected."
+              << std::endl;
+    userMap.erase(clientSocket);
+  }
+
   for (auto &room : rooms) {
     // Duyệt tìm và xóa socket khỏi vector participants
     auto it = std::remove(room.participants.begin(), room.participants.end(),
@@ -210,6 +225,18 @@ void RoomManager::removeClient(SocketType clientSocket) {
                 << room.id << std::endl;
     }
   }
+}
+
+void RoomManager::loginUser(SocketType sock, std::string name) {
+  std::lock_guard<std::recursive_mutex> lock(roomsMutex);
+  userMap[sock] = name;
+}
+
+std::string RoomManager::getUsername(SocketType sock) {
+  std::lock_guard<std::recursive_mutex> lock(roomsMutex);
+  if (userMap.count(sock))
+    return userMap[sock];
+  return "Unknown";
 }
 
 bool RoomManager::leaveRoom(int roomId, SocketType clientSocket) {
@@ -252,9 +279,16 @@ void RoomManager::updateTimers(BroadcastCallback callback) {
       // --- HẾT GIỜ ---
       // 1. Lưu kết quả sản phẩm VỪA KẾT THÚC
       if (r.highestBidderSocket != -1) {
+        // Lấy danh sách participants
+        std::vector<std::string> participants;
+        for (auto s : r.participants) {
+          if (userMap.count(s))
+            participants.push_back(userMap[s]);
+        }
+
         DatabaseManager::getInstance().saveAuctionResult(
             r.id, r.itemName, r.currentPrice,
-            std::to_string(r.highestBidderSocket));
+            std::to_string(r.highestBidderSocket), participants);
 
         // Gửi thông báo ai thắng sản phẩm cũ
         std::string soldMsg = "SOLD_ITEM|" + r.itemName + "|" +
