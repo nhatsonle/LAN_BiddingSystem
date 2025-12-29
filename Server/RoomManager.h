@@ -61,6 +61,9 @@ public:
   void loginUser(SocketType sock, std::string name);
   std::string getUsername(SocketType sock);
 
+  // Recovery
+  void loadState();
+
 private:
   std::map<SocketType, std::string> userMap;
 };

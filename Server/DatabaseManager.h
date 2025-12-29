@@ -1,6 +1,7 @@
 #ifndef DATABASEMANAGER_H
 #define DATABASEMANAGER_H
 
+#include "Room.h"
 #include "sqlite3.h" // Include thư viện vừa tải
 #include <iostream>
 #include <string>
@@ -29,10 +30,15 @@ public:
   std::string getHistoryList(const std::string &username);
 
   // --- Room & Product Management ---
+  // --- Room & Product Management ---
   int createRoom(const std::string &name);
-  void saveProduct(int roomId, const std::string &name, int startPrice,
-                   int buyNowPrice, int duration);
+  int saveProduct(int roomId, const std::string &name, int startPrice,
+                  int buyNowPrice, int duration);
   void updateRoomStatus(int roomId, const std::string &status);
+  void updateProductStatus(int productId, const std::string &status);
+
+  // Recovery
+  std::vector<Room> loadOpenRooms();
 
 private:
   sqlite3 *db; // Con trỏ quản lý kết nối DB

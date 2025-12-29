@@ -8,6 +8,7 @@
 typedef int SocketType;
 // 1. Định nghĩa cấu trúc Sản phẩm
 struct Product {
+  int id; // <-- ID tu Database
   std::string name;
   int startPrice;
   int buyNowPrice;
@@ -19,6 +20,7 @@ struct Room {
   int id;
 
   // --- THÔNG TIN SẢN PHẨM ĐANG ĐẤU GIÁ (ACTIVE) ---
+  int currentProductId; // <-- ID san pham hien tai
   std::string itemName;
   int currentPrice;
   int buyNowPrice;

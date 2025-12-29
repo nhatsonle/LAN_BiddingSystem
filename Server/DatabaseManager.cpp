@@ -211,9 +211,9 @@ int DatabaseManager::createRoom(const std::string &name) {
   return (int)sqlite3_last_insert_rowid(db);
 }
 
-void DatabaseManager::saveProduct(int roomId, const std::string &name,
-                                  int startPrice, int buyNowPrice,
-                                  int duration) {
+int DatabaseManager::saveProduct(int roomId, const std::string &name,
+                                 int startPrice, int buyNowPrice,
+                                 int duration) {
   std::string sql = "INSERT INTO products (room_id, name, start_price, "
                     "buy_now_price, duration) VALUES (" +
                     std::to_string(roomId) + ", '" + name + "', " +
@@ -226,7 +226,9 @@ void DatabaseManager::saveProduct(int roomId, const std::string &name,
   if (rc != SQLITE_OK) {
     std::cerr << "[DB ERROR] Save Product: " << zErrMsg << std::endl;
     sqlite3_free(zErrMsg);
+    return -1;
   }
+  return (int)sqlite3_last_insert_rowid(db);
 }
 
 void DatabaseManager::updateRoomStatus(int roomId, const std::string &status) {
@@ -236,4 +238,107 @@ void DatabaseManager::updateRoomStatus(int roomId, const std::string &status) {
   sqlite3_exec(db, sql.c_str(), 0, 0, &zErrMsg);
   if (zErrMsg)
     sqlite3_free(zErrMsg);
+}
+
+void DatabaseManager::updateProductStatus(int productId,
+                                          const std::string &status) {
+  std::string sql = "UPDATE products SET status='" + status +
+                    "' WHERE id=" + std::to_string(productId) + ";";
+  char *zErrMsg = 0;
+  sqlite3_exec(db, sql.c_str(), 0, 0, &zErrMsg);
+  if (zErrMsg)
+    sqlite3_free(zErrMsg);
+}
+
+// Helper structs for loading
+struct RoomData {
+  int id;
+  std::string name;
+};
+struct ProdData {
+  int id;
+  int roomId;
+  std::string name;
+  int start;
+  int buyNow;
+  int duration;
+};
+
+std::vector<Room> DatabaseManager::loadOpenRooms() {
+  std::vector<Room> result;
+  char *zErrMsg = 0;
+
+  // 1. Load Rooms
+  std::vector<RoomData> roomList;
+  auto cbRoom = [](void *data, int argc, char **argv, char **col) -> int {
+    auto *list = (std::vector<RoomData> *)data;
+    RoomData r;
+    r.id = std::stoi(argv[0]);
+    r.name = (argv[1] ? argv[1] : "");
+    list->push_back(r);
+    return 0;
+  };
+
+  std::string sqlRooms = "SELECT id, name FROM rooms WHERE status='OPEN';";
+  sqlite3_exec(db, sqlRooms.c_str(), cbRoom, &roomList, &zErrMsg);
+
+  if (zErrMsg) {
+    std::cerr << "Load Rooms: " << zErrMsg << std::endl;
+    sqlite3_free(zErrMsg);
+  }
+
+  // 2. Load Products for each room
+  for (auto &rd : roomList) {
+    Room room;
+    room.id = rd.id;
+    room.isClosed = false;
+    room.isWaitingNextItem = false;
+    room.currentProductId = -1;
+    room.highestBidderSocket = -1;
+
+    std::vector<ProdData> pList;
+    auto cbProd = [](void *data, int argc, char **argv, char **col) -> int {
+      auto *list = (std::vector<ProdData> *)data;
+      ProdData p;
+      p.id = std::stoi(argv[0]);
+      p.name = (argv[1] ? argv[1] : "");
+      p.start = std::stoi(argv[2]);
+      p.buyNow = std::stoi(argv[3]);
+      p.duration = std::stoi(argv[4]);
+      list->push_back(p);
+      return 0;
+    };
+    std::string sqlP =
+        "SELECT id, name, start_price, buy_now_price, duration FROM products "
+        "WHERE room_id=" +
+        std::to_string(rd.id) + " AND status='WAITING' ORDER BY id ASC;";
+
+    sqlite3_exec(db, sqlP.c_str(), cbProd, &pList, &zErrMsg);
+    if (pList.empty())
+      continue; // Room hết hàng hoặc lỗi -> Bỏ qua
+
+    // Setup Active Product
+    ProdData &first = pList[0];
+    room.currentProductId = first.id;
+    room.itemName = first.name;
+    room.currentPrice = first.start;
+    room.buyNowPrice = first.buyNow;
+    room.initialDuration = first.duration;
+    room.timeLeft = first.duration;
+
+    // Setup Queue
+    for (size_t i = 1; i < pList.size(); ++i) {
+      Product p;
+      p.id = pList[i].id;
+      p.name = pList[i].name;
+      p.startPrice = pList[i].start;
+      p.buyNowPrice = pList[i].buyNow;
+      p.duration = pList[i].duration;
+      room.productQueue.push(p);
+    }
+
+    result.push_back(room);
+  }
+
+  return result;
 }

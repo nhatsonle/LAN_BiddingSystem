@@ -20,15 +20,21 @@ int RoomManager::createRoom(std::string roomName,
   newRoom.id = dbRoomId;
 
   // --- LƯU TẤT CẢ SẢN PHẨM VÀO DB ---
-  for (const auto &p : products) {
-    DatabaseManager::getInstance().saveProduct(newRoom.id, p.name, p.startPrice,
-                                               p.buyNowPrice, p.duration);
+  // Lưu ý: products ở đây là tham số truyền vào (chưa có ID)
+  // Ta cần lưu ID lại vào vector để đẩy vào queue
+  std::vector<Product> productsWithId = products;
+
+  for (size_t i = 0; i < productsWithId.size(); ++i) {
+    int pid = DatabaseManager::getInstance().saveProduct(
+        newRoom.id, productsWithId[i].name, productsWithId[i].startPrice,
+        productsWithId[i].buyNowPrice, productsWithId[i].duration);
+    productsWithId[i].id = pid;
   }
 
   // --- LẤY SẢN PHẨM ĐẦU TIÊN LÀM ACTIVE ---
-  Product firstP = products[0];
-  newRoom.itemName = firstP.name; // Lưu ý: roomName hiện tại dùng chung với
-                                  // itemName đầu tiên hoặc bạn lưu riêng
+  Product firstP = productsWithId[0];
+  newRoom.itemName = firstP.name;
+  newRoom.currentProductId = firstP.id; // <-- Lưu ID
   newRoom.currentPrice = firstP.startPrice;
   newRoom.buyNowPrice = firstP.buyNowPrice;
   newRoom.initialDuration = firstP.duration;
@@ -38,8 +44,8 @@ int RoomManager::createRoom(std::string roomName,
   newRoom.isWaitingNextItem = false;
 
   // --- ĐẨY CÁC SẢN PHẨM CÒN LẠI VÀO QUEUE ---
-  for (size_t i = 1; i < products.size(); ++i) {
-    newRoom.productQueue.push(products[i]);
+  for (size_t i = 1; i < productsWithId.size(); ++i) {
+    newRoom.productQueue.push(productsWithId[i]);
   }
 
   rooms.push_back(newRoom);
@@ -57,6 +63,7 @@ bool RoomManager::loadNextProduct(Room &r) {
 
   // 2. Cập nhật trạng thái phòng (Reset về ban đầu)
   r.itemName = nextP.name;
+  r.currentProductId = nextP.id; // <-- Update ID
   r.currentPrice = nextP.startPrice;
   r.buyNowPrice = nextP.buyNowPrice;
   r.initialDuration = nextP.duration;
@@ -342,5 +349,25 @@ void RoomManager::updateTimers(BroadcastCallback callback) {
       r.isWaitingNextItem = true;
       r.timeLeft = 3; // Chờ 3 giây
     }
+  }
+}
+
+void RoomManager::loadState() {
+  std::lock_guard<std::recursive_mutex> lock(roomsMutex);
+  rooms = DatabaseManager::getInstance().loadOpenRooms();
+
+  // Update Max ID để tránh trùng (Room ID tự tăng trong DB rồi, nhưng biến
+  // counter...)
+  if (!rooms.empty()) {
+    int maxId = 0;
+    for (const auto &r : rooms) {
+      if (r.id > maxId)
+        maxId = r.id;
+      std::cout << "[RECOVERY] Loaded Room " << r.id
+                << " - Item: " << r.itemName << std::endl;
+    }
+    roomIdCounter = maxId + 1;
+  } else {
+    std::cout << "[RECOVERY] No open rooms found." << std::endl;
   }
 }
