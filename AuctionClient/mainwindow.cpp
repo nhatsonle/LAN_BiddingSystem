@@ -239,6 +239,9 @@ void MainWindow::onReadyRead()
             // Chuyển sang trang Lobby (Index 1)
             ui->stackedWidget->setCurrentIndex(1);
 
+            // Hiển thị tên người dùng sau khi đăng nhập
+            ui->label->setText("Xin chào, " + m_username);
+
             // Tự động lấy danh sách phòng luôn
             on_btnRefresh_clicked();
         }
@@ -550,4 +553,3 @@ void MainWindow::on_cboSort_currentIndexChanged(int index)
         ui->listRooms->addItem(item);
     }
 }
-
