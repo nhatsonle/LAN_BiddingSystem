@@ -12,7 +12,18 @@ int RoomManager::createRoom(std::string roomName,
     return -1;
 
   Room newRoom;
-  newRoom.id = roomIdCounter++;
+  // newRoom.id = roomIdCounter++;
+  // THAY ĐỔI: Gọi DB để lấy ID phòng (Persistent)
+  int dbRoomId = DatabaseManager::getInstance().createRoom(roomName);
+  if (dbRoomId == -1)
+    return -1;
+  newRoom.id = dbRoomId;
+
+  // --- LƯU TẤT CẢ SẢN PHẨM VÀO DB ---
+  for (const auto &p : products) {
+    DatabaseManager::getInstance().saveProduct(newRoom.id, p.name, p.startPrice,
+                                               p.buyNowPrice, p.duration);
+  }
 
   // --- LẤY SẢN PHẨM ĐẦU TIÊN LÀM ACTIVE ---
   Product firstP = products[0];
@@ -24,6 +35,7 @@ int RoomManager::createRoom(std::string roomName,
   newRoom.timeLeft = firstP.duration;
   newRoom.highestBidderSocket = -1;
   newRoom.isClosed = false;
+  newRoom.isWaitingNextItem = false;
 
   // --- ĐẨY CÁC SẢN PHẨM CÒN LẠI VÀO QUEUE ---
   for (size_t i = 1; i < products.size(); ++i) {
@@ -51,6 +63,7 @@ bool RoomManager::loadNextProduct(Room &r) {
 
   r.timeLeft = nextP.duration; // Reset thời gian
   r.highestBidderSocket = -1;  // Reset người thắng
+  r.isWaitingNextItem = false; // <-- Đảm bảo reset trạng thái
 
   std::cout << "[QUEUE] Switched to next item: " << r.itemName << std::endl;
   return true;
@@ -117,6 +130,9 @@ bool RoomManager::buyNow(int roomId, SocketType buyerSocket,
       } else {
         // B. HẾT HÀNG -> Đóng phòng vĩnh viễn
         r.isClosed = true;
+        // UPDATE DB STATUS
+        DatabaseManager::getInstance().updateRoomStatus(r.id, "CLOSED");
+
         if (callback)
           callback(r.id, "CLOSED|Hết hàng đấu giá\n");
       }
@@ -272,14 +288,38 @@ void RoomManager::updateTimers(BroadcastCallback callback) {
 
     r.timeLeft--;
 
+    // --- TRẠNG THÁI CHỜ (GIỮA 2 SẢN PHẨM) ---
+    if (r.isWaitingNextItem) {
+      if (r.timeLeft <= 0) {
+        // Hết 3s chờ -> Chuyển sản phẩm
+        if (loadNextProduct(r)) {
+          // Format: NEXT_ITEM|Name|Price|BuyNow|Duration
+          std::string nextMsg = "NEXT_ITEM|" + r.itemName + "|" +
+                                std::to_string(r.currentPrice) + "|" +
+                                std::to_string(r.buyNowPrice) + "|" +
+                                std::to_string(r.initialDuration) + "\n";
+          callback(r.id, nextMsg);
+        } else {
+          // Hết hàng -> Đóng
+          r.isClosed = true;
+          DatabaseManager::getInstance().updateRoomStatus(r.id, "CLOSED");
+          callback(r.id, "CLOSED|Hết hàng đấu giá\n");
+        }
+        // Đã chuyển xong (hoặc đóng), tắt trạng thái chờ
+        r.isWaitingNextItem = false;
+      }
+      continue; // Không xử lý logic đếm ngược bình thường
+    }
+
+    // --- TRẠNG THÁI ĐẤU GIÁ BÌNH THƯỜNG ---
     if (r.timeLeft > 0) {
       std::string msg = "TIME_UPDATE|" + std::to_string(r.timeLeft) + "\n";
       callback(r.id, msg);
     } else {
-      // --- HẾT GIỜ ---
-      // 1. Lưu kết quả sản phẩm VỪA KẾT THÚC
+      // --- HẾT GIỜ (TIMEOUT) ---
+      // 1. Lưu kết quả
       if (r.highestBidderSocket != -1) {
-        // Lấy danh sách participants
+        // ... (Lấy participants và Save DB như cũ) ...
         std::vector<std::string> participants;
         for (auto s : r.participants) {
           if (userMap.count(s))
@@ -290,7 +330,6 @@ void RoomManager::updateTimers(BroadcastCallback callback) {
             r.id, r.itemName, r.currentPrice,
             std::to_string(r.highestBidderSocket), participants);
 
-        // Gửi thông báo ai thắng sản phẩm cũ
         std::string soldMsg = "SOLD_ITEM|" + r.itemName + "|" +
                               std::to_string(r.currentPrice) + "|" +
                               std::to_string(r.highestBidderSocket) + "\n";
@@ -299,26 +338,9 @@ void RoomManager::updateTimers(BroadcastCallback callback) {
         callback(r.id, "Pass_Item|Không ai mua " + r.itemName + "\n");
       }
 
-      // 2. CHECK QUEUE: CÒN HÀNG KHÔNG?
-      if (loadNextProduct(r)) {
-        // --- CÒN HÀNG -> GỬI LỆNH NEXT_ITEM ---
-        // Format: NEXT_ITEM|Name|Price|BuyNow|Duration
-        std::string nextMsg = "NEXT_ITEM|" + r.itemName + "|" +
-                              std::to_string(r.currentPrice) + "|" +
-                              std::to_string(r.buyNowPrice) + "|" +
-                              std::to_string(r.initialDuration) + "\n";
-
-        // Ngủ 2 giây để client kịp đọc thông báo cũ trước khi đổi màn hình
-        // (Thực tế nên làm ở client, nhưng server delay xíu cho an toàn)
-        std::this_thread::sleep_for(std::chrono::seconds(2));
-
-        callback(r.id, nextMsg);
-      } else {
-        // --- HẾT HÀNG -> ĐÓNG PHÒNG VĨNH VIỄN ---
-        r.isClosed = true;
-        r.timeLeft = 0;
-        callback(r.id, "CLOSED|Hết hàng đấu giá\n");
-      }
+      // 2. CHUYỂN SANG TRẠNG THÁI CHỜ (Thay vì sleep)
+      r.isWaitingNextItem = true;
+      r.timeLeft = 3; // Chờ 3 giây
     }
   }
 }

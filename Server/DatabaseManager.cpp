@@ -62,6 +62,33 @@ bool DatabaseManager::init(const std::string &dbName) {
     sqlite3_free(zErrMsg);
   }
 
+  // 5. Tạo bảng Rooms
+  const char *sqlRooms = "CREATE TABLE IF NOT EXISTS rooms ("
+                         "id INTEGER PRIMARY KEY AUTOINCREMENT,"
+                         "name TEXT,"
+                         "status TEXT DEFAULT 'OPEN');"; // OPEN, CLOSED
+  rc = sqlite3_exec(db, sqlRooms, 0, 0, &zErrMsg);
+  if (rc != SQLITE_OK) {
+    std::cerr << "SQL error (Create Rooms): " << zErrMsg << std::endl;
+    sqlite3_free(zErrMsg);
+  }
+
+  // 6. Tạo bảng Products
+  const char *sqlProducts = "CREATE TABLE IF NOT EXISTS products ("
+                            "id INTEGER PRIMARY KEY AUTOINCREMENT,"
+                            "room_id INTEGER,"
+                            "name TEXT,"
+                            "start_price INTEGER,"
+                            "buy_now_price INTEGER,"
+                            "duration INTEGER,"
+                            "status TEXT DEFAULT 'WAITING',"
+                            "FOREIGN KEY(room_id) REFERENCES rooms(id));";
+  rc = sqlite3_exec(db, sqlProducts, 0, 0, &zErrMsg);
+  if (rc != SQLITE_OK) {
+    std::cerr << "SQL error (Create Products): " << zErrMsg << std::endl;
+    sqlite3_free(zErrMsg);
+  }
+
   return true;
 }
 
@@ -169,4 +196,44 @@ std::string DatabaseManager::getHistoryList(const std::string &username) {
   }
 
   return list;
+}
+
+int DatabaseManager::createRoom(const std::string &name) {
+  std::string sql = "INSERT INTO rooms (name) VALUES ('" + name + "');";
+  char *zErrMsg = 0;
+  int rc = sqlite3_exec(db, sql.c_str(), 0, 0, &zErrMsg);
+
+  if (rc != SQLITE_OK) {
+    std::cerr << "[DB ERROR] Create Room: " << zErrMsg << std::endl;
+    sqlite3_free(zErrMsg);
+    return -1;
+  }
+  return (int)sqlite3_last_insert_rowid(db);
+}
+
+void DatabaseManager::saveProduct(int roomId, const std::string &name,
+                                  int startPrice, int buyNowPrice,
+                                  int duration) {
+  std::string sql = "INSERT INTO products (room_id, name, start_price, "
+                    "buy_now_price, duration) VALUES (" +
+                    std::to_string(roomId) + ", '" + name + "', " +
+                    std::to_string(startPrice) + ", " +
+                    std::to_string(buyNowPrice) + ", " +
+                    std::to_string(duration) + ");";
+
+  char *zErrMsg = 0;
+  int rc = sqlite3_exec(db, sql.c_str(), 0, 0, &zErrMsg);
+  if (rc != SQLITE_OK) {
+    std::cerr << "[DB ERROR] Save Product: " << zErrMsg << std::endl;
+    sqlite3_free(zErrMsg);
+  }
+}
+
+void DatabaseManager::updateRoomStatus(int roomId, const std::string &status) {
+  std::string sql = "UPDATE rooms SET status='" + status +
+                    "' WHERE id=" + std::to_string(roomId) + ";";
+  char *zErrMsg = 0;
+  sqlite3_exec(db, sql.c_str(), 0, 0, &zErrMsg);
+  if (zErrMsg)
+    sqlite3_free(zErrMsg);
 }

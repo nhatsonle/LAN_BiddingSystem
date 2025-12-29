@@ -28,6 +28,12 @@ public:
   // Hàm lấy chuỗi danh sách lịch sử theo user
   std::string getHistoryList(const std::string &username);
 
+  // --- Room & Product Management ---
+  int createRoom(const std::string &name);
+  void saveProduct(int roomId, const std::string &name, int startPrice,
+                   int buyNowPrice, int duration);
+  void updateRoomStatus(int roomId, const std::string &status);
+
 private:
   sqlite3 *db; // Con trỏ quản lý kết nối DB
   DatabaseManager() : db(nullptr) {}
