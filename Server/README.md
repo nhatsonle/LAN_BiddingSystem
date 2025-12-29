@@ -1,141 +1,137 @@
-Hệ Thống Đấu Giá Trực Tuyến - Server Side
+# Online Auction System – Server Side
 
-Đây là phần backend (Server) của dự án Đấu giá trực tuyến. Server được viết bằng C++ thuần, sử dụng kiến trúc Đa luồng (Multithreading) để xử lý nhiều kết nối đồng thời và SQLite để lưu trữ dữ liệu bền vững.
+This repository contains the **server-side (backend)** implementation of an **Online Auction System**, developed in **pure C++**.  
+The server supports **multiple concurrent clients** using a **multithreaded architecture**, communicates via **raw TCP sockets**, and persists data using an embedded **SQLite** database.
 
-🛠 Công nghệ sử dụng
+---
 
-Ngôn ngữ: C++ (Standard C++11/17).
+## 📌 Overview
 
-Giao tiếp mạng: Raw TCP Sockets (Sys-socket trên Linux).
+- **Architecture**: Multithreaded TCP Server  
+- **Concurrency Model**: One thread per client  
+- **Persistence**: SQLite (embedded, file-based)  
+- **Design Patterns**:
+  - Singleton Pattern (Managers)
+  - Mutex / Recursive Mutex (thread safety)
 
-Cơ sở dữ liệu: SQLite (Embedded).
+The system is organized into three logical layers:
+- **Network Layer** – Socket handling and protocol parsing  
+- **Business Logic Layer** – Auction rooms and bidding logic  
+- **Data Layer** – Database access and persistence  
 
-Mô hình: Singleton Pattern (cho các Manager), Mutex Locking (xử lý đồng bộ luồng).
+---
 
-📂 Cấu trúc thư mục
+## 🛠 Technology Stack
+
+| Category | Technology |
+|-------|-----------|
+| Language | C++ (C++11 / C++17) |
+| Networking | Raw TCP Sockets (POSIX / Linux) |
+| Concurrency | `std::thread`, `pthread`, `mutex` |
+| Database | SQLite (Amalgamation) |
+| Build Tool | Makefile |
+| Platform | Linux / WSL / Windows (MSVC compatible) |
+
+---
+
+## 📂 Directory Structure
 
 Server/
-├── main.cpp                # Điểm khởi chạy chương trình, khởi tạo Database và Server.
-├── AuctionServer.h/.cpp    # [Network Layer] Quản lý kết nối Socket, luồng (Thread) cho từng Client.
-├── RoomManager.h/.cpp      # [Business Logic] Quản lý phòng đấu giá, timer, xử lý Bid/BuyNow/Queue.
-├── DatabaseManager.h/.cpp  # [Data Layer] Xử lý mọi thao tác SQL (Login, Register, History).
-├── Room.h                  # [Model] Định nghĩa cấu trúc dữ liệu: Room, Product, SoldItem.
-├── sqlite3.c / .h          # Thư viện SQLite (Amalgamation code).
-├── auction_system.db       # File cơ sở dữ liệu (Tự động sinh ra khi chạy).
-└── Makefile                # File cấu hình biên dịch.
+├── main.cpp # Entry point: initializes database and server
+├── AuctionServer.h/.cpp # Network layer: socket handling and client threads
+├── RoomManager.h/.cpp # Business logic: rooms, bidding, timers
+├── DatabaseManager.h/.cpp # Data layer: SQL operations (login, register, history)
+├── Room.h # Data models: Room, Product, SoldItem
+├── sqlite3.c / sqlite3.h # SQLite amalgamation source
+├── auction_system.db # SQLite database (auto-generated)
+└── Makefile # Build configuration
 
 
+---
 
-🚀 Hướng dẫn Cài đặt & Chạy
+## 🚀 Build & Run
 
-Yêu cầu
+### Prerequisites
 
-Trình biên dịch G++ hoặc MSVC.
+- **Compiler**
+  - `g++` (Linux / WSL) or **MSVC** (Windows)
+- **Libraries**
+  - `pthread`
+  - `libdl` (required by SQLite on Linux)
 
-Thư viện pthread (thường có sẵn trên Linux).
+---
 
-Thư viện libdl (cho SQLite trên Linux).
+### Build (Makefile)
 
-Cách biên dịch (Sử dụng Makefile)
-
-Mở terminal tại thư mục Server.
-
-Chạy lệnh để biên dịch:
-
+```bash
 make
 
+This command compiles:
+- C source (sqlite3.c)
+- C++ server source files
 
+### Run the Server
+- **Linux**
+```bash
+./server
+```
+The server listens on port 8080 by default.
 
-Lệnh này sẽ tự động biên dịch chéo C (cho SQLite) và C++ (cho Server).
+### Communication Protocol
 
-Chạy Server:
+The server uses a simple text-based protocol for communication with clients. Each message is formatted as follows:
 
-Linux/WSL: ./server
+- Fields are separated by `|`
+- Each command ends with `\n`
+- Requests and responses are UTF-8 strings
 
-Windows: server.exe
+### Supported Commands
 
-Server sẽ lắng nghe tại Port mặc định 8080.
+| Function     | Client Request | Server Response |           |              |                     |               |
+| -------  | ----- | -------------- | --------------- | --------- | ------------ | ------------------- | ------------- |
+| Login        | `LOGIN         | username        | password` | `OK          | LOGIN_SUCCESS`/`ERR | LOGIN_FAILED` |
+| Register     | `REGISTER      | username        | password` | `OK          | REGISTER_SUCCESS`   |               |
+| Create Room  | `CREATE_ROOM   | RoomName`       | `OK       | ROOM_CREATED | RoomID`             |               |
+| Join Room    | `JOIN_ROOM     | RoomID`         | `OK       | JOINED`      |                     |               |
+| Bid          | `BID           | RoomID          | Amount`   | `OK          | BID_ACCEPTED`       |               |
+| Get Products | `GET_PRODUCTS  | RoomID`         | `OK       | PRODUCT_LIST | ...`                |               |
 
-📡 Giao thức giao tiếp (Protocol)
+## Extending the System
+### Example: Add Kick User Feature
+### Step 1: Define the Protocol
+- Client Request: `KICK|RoomID|UserID`
 
-Hệ thống sử dụng giao thức dạng chuỗi văn bản, ngăn cách bởi ký tự |. Mỗi lệnh kết thúc bằng ký tự xuống dòng \n.
-
-Chức năng
-
-Client gửi (Request)
-
-Server trả về (Response)
-
-Đăng nhập
-
-`LOGIN
-
-user
-
-Đăng ký
-
-`REGISTER
-
-user
-
-Tạo phòng
-
-`CREATE_ROOM
-
-Name
-
-Vào phòng
-
-`JOIN_ROOM
-
-ID`
-
-Đấu giá
-
-`BID
-
-ID
-
-Lấy DS SP
-
-`GET_PRODUCTS
-
-ID`
-
-👨‍💻 Hướng dẫn Thêm/Sửa Tính năng mới
-
-Quy trình chuẩn để thêm một tính năng (Ví dụ: Tính năng "Kick User") gồm 3 bước:
-
-Bước 1: Định nghĩa Protocol
-
-Quyết định định dạng lệnh. Ví dụ Client sẽ gửi: KICK|RoomID|UserID.
-
-Bước 2: Xử lý lệnh tại AuctionServer.cpp
-
-Tìm hàm processCommand, thêm nhánh else if mới:
-
+### Step 2: Handle Command in AuctionServer.cpp
+```cpp
 else if (cmd == "KICK") {
-    int rId = std::stoi(tokens[1]);
-    int uId = std::stoi(tokens[2]);
-    
-    // Gọi Logic xử lý bên Manager
-    if (RoomManager::getInstance().kickUser(rId, uId)) {
+    int roomId = std::stoi(tokens[1]);
+    int userId = std::stoi(tokens[2]);
+
+    if (RoomManager::getInstance().kickUser(roomId, userId)) {
         return "OK|KICK_SUCCESS";
     }
     return "ERR|CANNOT_KICK";
 }
 
+```
 
-
-Bước 3: Cài đặt Logic nghiệp vụ
-
-Nếu tính năng liên quan đến phòng, mở RoomManager.cpp:
-
+### Step 3: Implement Business Logic in RoomManager.cpp
+```cpp
 bool RoomManager::kickUser(int roomId, int userId) {
-    std::lock_guard<std::recursive_mutex> lock(roomsMutex); // Quan trọng: Phải khóa Mutex
-    // 1. Tìm phòng
-    // 2. Tìm User trong phòng -> Xóa khỏi vector participants
-    // 3. Đóng socket của user đó (nếu cần)
+    std::lock_guard<std::recursive_mutex> lock(roomsMutex);
+
+    // 1. Find room
+    // 2. Locate user in participants list
+    // 3. Remove user from room
+    // 4. Optionally close user's socket
+
     return true;
 }
+```
+⚠️ Always lock shared resources using mutexes to ensure thread safety.
 
+## Concurrency and Design Notes
+- Each client connection is handled in a dedicated thread
+- Shared data structures are protected with mutex locks
+- Singleton Managers provide centralized and controlled access
+- All database operations are abstracted via DatabaseManager
