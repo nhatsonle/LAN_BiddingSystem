@@ -224,23 +224,35 @@ std::string AuctionServer::processCommand(SocketType clientSocket,
 
 void AuctionServer::handleClient(SocketType clientSocket) {
   char buffer[1024];
+  std::string dataBuffer = "";
+
   while (true) {
     memset(buffer, 0, 1024);
     int bytes = recv(clientSocket, buffer, 1024, 0);
     if (bytes <= 0)
       break;
 
-    std::string msg(buffer);
-    // Clean chuỗi
-    msg.erase(std::remove(msg.begin(), msg.end(), '\n'), msg.end());
-    msg.erase(std::remove(msg.begin(), msg.end(), '\r'), msg.end());
+    dataBuffer.append(buffer, bytes);
 
-    std::cout << "[RECV " << clientSocket << "]: " << msg << std::endl;
+    // Process all complete commands (ending with \n)
+    size_t pos = 0;
+    while ((pos = dataBuffer.find('\n')) != std::string::npos) {
+      std::string msg = dataBuffer.substr(0, pos);
+      dataBuffer.erase(0, pos + 1);
 
-    std::string response = processCommand(clientSocket, msg);
-    if (!response.empty()) {
-      response += "\n";
-      send(clientSocket, response.c_str(), response.length(), 0);
+      // Clean carriage return if present
+      msg.erase(std::remove(msg.begin(), msg.end(), '\r'), msg.end());
+
+      if (msg.empty())
+        continue;
+
+      std::cout << "[RECV " << clientSocket << "]: " << msg << std::endl;
+
+      std::string response = processCommand(clientSocket, msg);
+      if (!response.empty()) {
+        response += "\n";
+        send(clientSocket, response.c_str(), response.length(), 0);
+      }
     }
   }
 

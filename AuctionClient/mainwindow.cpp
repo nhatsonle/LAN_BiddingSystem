@@ -295,7 +295,7 @@ void MainWindow::onReadyRead() {
       // Debug xem dữ liệu thô sau khi cắt header là gì
       qDebug() << "[DEBUG] List Data Raw:" << data;
 
-      QStringList rooms = data.split('\n', Qt::SkipEmptyParts);
+      QStringList rooms = data.split(';', Qt::SkipEmptyParts);
 
       for (const QString &roomStr : rooms) {
         // Format từng dòng: ID:Name:Price:BuyNow
