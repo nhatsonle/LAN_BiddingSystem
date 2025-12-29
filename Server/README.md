@@ -95,7 +95,6 @@ The server uses a simple text-based protocol for communication with clients. Eac
 | Join Room    | `JOIN_ROOM|RoomID`                 | `OK|JOINED`                        |
 | Bid          | `BID|RoomID|Amount`                | `OK|BID_ACCEPTED`                  |
 | Get Products | `GET_PRODUCTS|RoomID`              | `OK|PRODUCT_LIST|...`              |
-               |               |
 
 ## Extending the System
 ### Example: Add Kick User Feature
