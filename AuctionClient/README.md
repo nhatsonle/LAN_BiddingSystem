@@ -95,7 +95,7 @@ This allows efficient access when handling UI click events without string parsin
 ### Example: Add a Quick Chat Feature (Already implemented)
 ### Step 1: Design UI (.ui)
 - Open mainwindow.ui
-- Drag a QPushButton
+- Add a new QPushButton
 - Set objectName to:
 ``` nginx
 btnChatQuick

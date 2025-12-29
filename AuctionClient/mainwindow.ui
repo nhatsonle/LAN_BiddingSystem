@@ -1,3 +1,4 @@
+<?xml version="1.0" encoding="UTF-8"?>
 <ui version="4.0">
  <class>MainWindow</class>
  <widget class="QMainWindow" name="MainWindow">
@@ -17,7 +18,7 @@
     <item row="0" column="0">
      <widget class="QStackedWidget" name="stackedWidget">
       <property name="currentIndex">
-       <number>0</number>
+       <number>1</number>
       </property>
       <widget class="QWidget" name="Login">
        <widget class="QLabel" name="lblLoginTitle">
@@ -33,11 +34,11 @@
          <string>Chào mừng đến phiên đấu giá</string>
         </property>
         <property name="alignment">
-         <set>Qt::AlignCenter</set>
+         <set>Qt::AlignmentFlag::AlignCenter</set>
         </property>
        </widget>
        <widget class="QLineEdit" name="txtUser">
-       <property name="geometry">
+        <property name="geometry">
          <rect>
           <x>200</x>
           <y>170</y>
@@ -59,12 +60,12 @@
          </rect>
         </property>
         <property name="echoMode">
-         <enum>QLineEdit::Password</enum>
+         <enum>QLineEdit::EchoMode::Password</enum>
         </property>
         <property name="placeholderText">
          <string>Nhập mật khẩu</string>
         </property>
-        </widget>
+       </widget>
        <widget class="QPushButton" name="btnLogin">
         <property name="geometry">
          <rect>
@@ -210,9 +211,12 @@ QPushButton:hover { background-color: #219150; }</string>
          </rect>
         </property>
         <property name="text">
-         <string />
+         <string/>
         </property>
-       <property name="placeholderText"><string>Tìm phòng hoặc sản phẩm...</string></property></widget>
+        <property name="placeholderText">
+         <string>Tìm phòng hoặc sản phẩm...</string>
+        </property>
+       </widget>
        <widget class="QComboBox" name="cboSort">
         <property name="geometry">
          <rect>
@@ -237,6 +241,19 @@ QPushButton:hover { background-color: #219150; }</string>
           <string>Giá giảm dần</string>
          </property>
         </item>
+       </widget>
+       <widget class="QPushButton" name="btnLogout">
+        <property name="geometry">
+         <rect>
+          <x>20</x>
+          <y>480</y>
+          <width>91</width>
+          <height>31</height>
+         </rect>
+        </property>
+        <property name="text">
+         <string>Đăng xuất</string>
+        </property>
        </widget>
       </widget>
       <widget class="QWidget" name="pageRoom">
@@ -374,7 +391,43 @@ QPushButton:hover { background-color: #d35400; }</string>
          <string>Giá mua ngay</string>
         </property>
        </widget>
-      <widget class="QLineEdit" name="txtChatInput"><property name="geometry"><rect><x>330</x><y>400</y><width>200</width><height>25</height></rect></property><property name="placeholderText"><string>Nhập tin nhắn...</string></property></widget><widget class="QPushButton" name="btnSendChat"><property name="geometry"><rect><x>540</x><y>397</y><width>90</width><height>31</height></rect></property><property name="text"><string>Gửi chat</string></property></widget><widget class="QTextBrowser" name="txtChatLog"><property name="geometry"><rect><x>330</x><y>250</y><width>300</width><height>130</height></rect></property></widget></widget>
+       <widget class="QLineEdit" name="txtChatInput">
+        <property name="geometry">
+         <rect>
+          <x>330</x>
+          <y>400</y>
+          <width>200</width>
+          <height>25</height>
+         </rect>
+        </property>
+        <property name="placeholderText">
+         <string>Nhập tin nhắn...</string>
+        </property>
+       </widget>
+       <widget class="QPushButton" name="btnSendChat">
+        <property name="geometry">
+         <rect>
+          <x>540</x>
+          <y>397</y>
+          <width>90</width>
+          <height>31</height>
+         </rect>
+        </property>
+        <property name="text">
+         <string>Gửi chat</string>
+        </property>
+       </widget>
+       <widget class="QTextBrowser" name="txtChatLog">
+        <property name="geometry">
+         <rect>
+          <x>330</x>
+          <y>250</y>
+          <width>300</width>
+          <height>130</height>
+         </rect>
+        </property>
+       </widget>
+      </widget>
      </widget>
     </item>
    </layout>
@@ -384,13 +437,13 @@ QPushButton:hover { background-color: #d35400; }</string>
     <rect>
      <x>0</x>
      <y>0</y>
-     <width>800</width>
+     <width>900</width>
      <height>21</height>
     </rect>
    </property>
   </widget>
-  <widget class="QStatusBar" name="statusbar" />
+  <widget class="QStatusBar" name="statusbar"/>
  </widget>
- <resources />
- <connections />
+ <resources/>
+ <connections/>
 </ui>
