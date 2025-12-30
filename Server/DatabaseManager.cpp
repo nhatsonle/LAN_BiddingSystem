@@ -333,6 +333,7 @@ struct RoomData {
   int id;
   std::string name;
   int hostUserId;
+  std::string hostName;
 };
 struct ProdData {
   int id;
@@ -355,12 +356,16 @@ std::vector<Room> DatabaseManager::loadOpenRooms() {
     r.id = std::stoi(argv[0]);
     r.name = (argv[1] ? argv[1] : "");
     r.hostUserId = argv[2] ? std::stoi(argv[2]) : -1;
+    r.hostName = (argv[3] ? argv[3] : "N/A");
     list->push_back(r);
     return 0;
   };
 
   std::string sqlRooms =
-      "SELECT id, name, COALESCE(created_by, -1) FROM rooms WHERE status='OPEN';";
+      "SELECT r.id, r.name, COALESCE(r.created_by, -1), "
+      "COALESCE(u.username,'N/A') "
+      "FROM rooms r LEFT JOIN users u ON r.created_by = u.id "
+      "WHERE r.status='OPEN';";
   sqlite3_exec(db, sqlRooms.c_str(), cbRoom, &roomList, &zErrMsg);
 
   if (zErrMsg) {
@@ -372,6 +377,7 @@ std::vector<Room> DatabaseManager::loadOpenRooms() {
   for (auto &rd : roomList) {
     Room room;
     room.id = rd.id;
+    room.hostName = rd.hostName;
     room.hostUserId = rd.hostUserId;
     room.isClosed = false;
     room.isWaitingNextItem = false;

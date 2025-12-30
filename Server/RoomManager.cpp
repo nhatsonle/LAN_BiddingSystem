@@ -49,6 +49,8 @@ int RoomManager::createRoom(std::string roomName, std::vector<Product> products,
   newRoom.highestBidderName = "";
   if (userMap.count(ownerSocket))
     newRoom.hostName = userMap[ownerSocket].username;
+  else
+    newRoom.hostName = "N/A";
   newRoom.hostUserId = ownerUserId;
   newRoom.bidCount = 0;
   newRoom.isClosed = false;
