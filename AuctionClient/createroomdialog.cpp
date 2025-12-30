@@ -2,6 +2,7 @@
 #include "ui_createroomdialog.h"
 #include <QMessageBox>
 #include <QDebug>
+#include <QDateTime>
 
 // --- Constructor: Khớp với header ---
 CreateRoomDialog::CreateRoomDialog(QWidget *parent) :
@@ -17,10 +18,12 @@ CreateRoomDialog::CreateRoomDialog(QWidget *parent) :
     // Giúp bạn nhập được giá tiền lớn thoải mái
     ui->spinStartPrice->setRange(0, 2000000000);
     ui->spinBuyNow->setRange(0, 2000000000);
+    ui->spinDuration->setRange(1, 1800); // tối đa 30 phút
 
     // 2. Chỉnh bước nhảy là 10.000 (Khi bấm nút mũi tên lên/xuống)
     ui->spinStartPrice->setSingleStep(10000);
     ui->spinBuyNow->setSingleStep(10000);
+    ui->spinDuration->setSingleStep(5);
 
     // 3. Hiển thị dấu phẩy ngăn cách hàng nghìn cho dễ nhìn
     // Ví dụ: 10,000,000 thay vì 10000000
@@ -46,6 +49,8 @@ CreateRoomDialog::CreateRoomDialog(QWidget *parent) :
 
     connect(ui->buttonBox, &QDialogButtonBox::accepted, this, &CreateRoomDialog::onVerify);
     connect(ui->buttonBox, &QDialogButtonBox::rejected, this, &QDialog::reject);
+
+    ui->dtStartTime->setDateTime(QDateTime::currentDateTime());
 }
 
 CreateRoomDialog::~CreateRoomDialog()
@@ -58,6 +63,7 @@ void CreateRoomDialog::resetInputForm() {
     ui->spinStartPrice->setValue(0);
     ui->spinBuyNow->setValue(0);
     ui->spinDuration->setValue(30); // Giá trị mặc định
+    ui->dtStartTime->setDateTime(QDateTime::currentDateTime());
     ui->txtName->setFocus();
 
     // Reset trạng thái về "Thêm mới"
@@ -188,6 +194,10 @@ void CreateRoomDialog::on_btnDelete_clicked() {
 // --- Các hàm Getter để lấy dữ liệu ra ---
 QString CreateRoomDialog::getRoomName() const {
     return ui->txtRoomName->text();
+}
+
+QString CreateRoomDialog::getStartTimeString() const {
+    return ui->dtStartTime->dateTime().toString("yyyy-MM-dd HH:mm:ss");
 }
 
 std::vector<ProductInfo> CreateRoomDialog::getProductList() const {

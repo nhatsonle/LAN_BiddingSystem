@@ -1,11 +1,12 @@
 #include "RoomManager.h"
 #include "DatabaseManager.h"
+#include <algorithm>
 #include <chrono>
 #include <iostream>
 #include <thread>
 
-int RoomManager::createRoom(std::string roomName,
-                            std::vector<Product> products) {
+int RoomManager::createRoom(std::string roomName, std::vector<Product> products,
+                            SocketType ownerSocket, int ownerUserId) {
   std::lock_guard<std::recursive_mutex> lock(roomsMutex);
 
   if (products.empty())
@@ -14,7 +15,8 @@ int RoomManager::createRoom(std::string roomName,
   Room newRoom;
   // newRoom.id = roomIdCounter++;
   // THAY ĐỔI: Gọi DB để lấy ID phòng (Persistent)
-  int dbRoomId = DatabaseManager::getInstance().createRoom(roomName);
+  int dbRoomId =
+      DatabaseManager::getInstance().createRoom(roomName, ownerUserId);
   if (dbRoomId == -1)
     return -1;
   newRoom.id = dbRoomId;
@@ -29,6 +31,8 @@ int RoomManager::createRoom(std::string roomName,
         newRoom.id, productsWithId[i].name, productsWithId[i].startPrice,
         productsWithId[i].buyNowPrice, productsWithId[i].duration);
     productsWithId[i].id = pid;
+    // Đảm bảo duration không vượt quá 30 phút (phù hợp DB)
+    productsWithId[i].duration = std::min(productsWithId[i].duration, 1800);
   }
 
   // --- LẤY SẢN PHẨM ĐẦU TIÊN LÀM ACTIVE ---
@@ -37,11 +41,28 @@ int RoomManager::createRoom(std::string roomName,
   newRoom.currentProductId = firstP.id; // <-- Lưu ID
   newRoom.currentPrice = firstP.startPrice;
   newRoom.buyNowPrice = firstP.buyNowPrice;
-  newRoom.initialDuration = firstP.duration;
-  newRoom.timeLeft = firstP.duration;
+  int cappedFirstDuration = std::min(firstP.duration, 1800);
+  newRoom.initialDuration = cappedFirstDuration;
+  newRoom.timeLeft = cappedFirstDuration;
   newRoom.highestBidderSocket = -1;
+  newRoom.highestBidderUserId = -1;
+  newRoom.hostUserId = ownerUserId;
   newRoom.isClosed = false;
   newRoom.isWaitingNextItem = false;
+
+  // Gắn chủ phòng với role HOST nếu có thông tin user/sock
+  if (ownerUserId > 0 && ownerSocket != -1) {
+    Participant host;
+    host.socket = ownerSocket;
+    host.userId = ownerUserId;
+    if (userMap.count(ownerSocket)) {
+      host.username = userMap[ownerSocket].username;
+    }
+    host.role = "HOST";
+    newRoom.participants.push_back(host);
+    DatabaseManager::getInstance().addRoomMember(newRoom.id, ownerUserId,
+                                                 host.role);
+  }
 
   // --- ĐẨY CÁC SẢN PHẨM CÒN LẠI VÀO QUEUE ---
   for (size_t i = 1; i < productsWithId.size(); ++i) {
@@ -63,13 +84,14 @@ bool RoomManager::loadNextProduct(Room &r) {
 
   // 2. Cập nhật trạng thái phòng (Reset về ban đầu)
   r.itemName = nextP.name;
-  r.currentProductId = nextP.id; // <-- Update ID
+  r.currentProductId = nextP.id;
   r.currentPrice = nextP.startPrice;
   r.buyNowPrice = nextP.buyNowPrice;
-  r.initialDuration = nextP.duration;
-
-  r.timeLeft = nextP.duration; // Reset thời gian
+  int cappedDuration = std::min(nextP.duration, 1800);
+  r.initialDuration = cappedDuration;
+  r.timeLeft = cappedDuration; // Reset thời gian
   r.highestBidderSocket = -1;  // Reset người thắng
+  r.highestBidderUserId = -1;
   r.isWaitingNextItem = false; // <-- Đảm bảo reset trạng thái
 
   std::cout << "[QUEUE] Switched to next item: " << r.itemName << std::endl;
@@ -84,10 +106,14 @@ bool RoomManager::buyNow(int roomId, SocketType buyerSocket,
     if (r.id == roomId) {
       if (r.isClosed)
         return false; // Phòng đóng rồi thì thôi
+      int buyerUserId = getUserId(buyerSocket);
+      if (buyerUserId == r.hostUserId)
+        return false; // chủ phòng không được mua
 
       // --- PHẦN 1: CHỐT ĐƠN SẢN PHẨM HIỆN TẠI ---
       r.currentPrice = r.buyNowPrice; // Giá chốt = Giá mua ngay
       r.highestBidderSocket = buyerSocket;
+      r.highestBidderUserId = buyerUserId;
       r.timeLeft = 0; // Dừng đồng hồ sản phẩm này
 
       // Chuẩn bị tin nhắn SOLD để trả về ngay cho người gọi (và broadcast)
@@ -100,18 +126,17 @@ bool RoomManager::buyNow(int roomId, SocketType buyerSocket,
       }
 
       // Lưu vào Database
-      // Lấy danh sách người tham gia (Username)
-      std::vector<std::string> participants;
-      for (auto s : r.participants) {
-        if (userMap.count(s))
-          participants.push_back(userMap[s]);
+      std::vector<int> participantIds;
+      for (const auto &p : r.participants) {
+        if (p.userId > 0) {
+          participantIds.push_back(p.userId);
+        }
       }
 
       // Lưu vào Database
       DatabaseManager::getInstance().saveAuctionResult(
-          r.id, r.itemName, r.currentPrice,
-          std::to_string(r.highestBidderSocket), participants);
-
+          r.id, r.currentProductId, r.itemName, r.currentPrice,
+          r.highestBidderUserId, participantIds);
       // --- PHẦN 2: XỬ LÝ HÀNG CHỜ (QUEUE) ---
       // Lưu ý: Đừng set r.isClosed = true vội, phải check hàng đã.
 
@@ -169,13 +194,33 @@ std::string RoomManager::getRoomList() {
 bool RoomManager::joinRoom(int roomId, SocketType clientSocket,
                            std::string &outRoomInfo) {
   std::lock_guard<std::recursive_mutex> lock(roomsMutex);
+
+  if (!userMap.count(clientSocket)) {
+    std::cerr << "[WARN] Unknown user trying to join room" << std::endl;
+    return false;
+  }
+
+  const auto &session = userMap[clientSocket];
+
   for (auto &r : rooms) {
     if (r.id == roomId) {
-      r.participants.push_back(clientSocket);
+      // tránh nhân bản socket
+      auto it = std::find_if(r.participants.begin(), r.participants.end(),
+                             [&](const Participant &p) {
+                               return p.socket == clientSocket;
+                             });
+      if (it == r.participants.end()) {
+        Participant p;
+        p.socket = clientSocket;
+        p.userId = session.userId;
+        p.username = session.username;
+        p.role = "BIDDER";
+        r.participants.push_back(p);
 
-      // --- CẬP NHẬT DÒNG NÀY ---
-      // Format cũ: ID|Name|CurrentPrice
-      // Format mới: ID|Name|CurrentPrice|BuyNowPrice
+        DatabaseManager::getInstance().addRoomMember(roomId, session.userId,
+                                                     p.role);
+      }
+
       outRoomInfo = std::to_string(r.id) + "|" + r.itemName + "|" +
                     std::to_string(r.currentPrice) + "|" +
                     std::to_string(r.buyNowPrice); // <-- Thêm cái này
@@ -195,10 +240,48 @@ bool RoomManager::placeBid(int roomId, int amount, SocketType bidderSocket,
       // Kiểm tra: Nếu phòng đã đóng thì không cho bid
       if (r.isClosed)
         return false;
-      // Yêu cầu: Giá mới phải cao hơn giá cũ ít nhất 10.000
-      if (amount > r.currentPrice + 10000) {
+      int bidderUserId = getUserId(bidderSocket);
+      if (bidderUserId == r.hostUserId)
+        return false; // chủ phòng không được bid
+      // Nếu giá bid chạm/qua giá mua ngay -> xử lý mua ngay
+      if (amount >= r.buyNowPrice) {
+        r.currentPrice = r.buyNowPrice;
+        r.highestBidderSocket = bidderSocket;
+        r.highestBidderUserId = bidderUserId;
+        r.timeLeft = 0;
+
+        // Lưu DB
+        std::vector<int> participantIds;
+        for (const auto &p : r.participants) {
+          if (p.userId > 0)
+            participantIds.push_back(p.userId);
+        }
+        DatabaseManager::getInstance().saveAuctionResult(
+            r.id, r.currentProductId, r.itemName, r.currentPrice,
+            r.highestBidderUserId, participantIds);
+
+        std::string soldMsg = "SOLD|" + std::to_string(r.currentPrice) + "|" +
+                              getUsername(bidderSocket) + "\n";
+
+        if (loadNextProduct(r)) {
+          std::string nextMsg =
+              "NEXT_ITEM|" + r.itemName + "|" + std::to_string(r.currentPrice) +
+              "|" + std::to_string(r.buyNowPrice) + "|" +
+              std::to_string(r.initialDuration) + "\n";
+          outBroadcastMsg = soldMsg + nextMsg;
+          r.isClosed = false;
+        } else {
+          r.isClosed = true;
+          DatabaseManager::getInstance().updateRoomStatus(r.id, "CLOSED");
+          outBroadcastMsg = soldMsg + "CLOSED|Hết hàng đấu giá\n";
+        }
+        return true;
+      }
+      // Yêu cầu: Giá mới phải cao hơn hoặc bằng giá cũ + 10.000
+      if (amount >= r.currentPrice + 10000) {
         r.currentPrice = amount;
         r.highestBidderSocket = bidderSocket;
+        r.highestBidderUserId = bidderUserId;
 
         // --- LUẬT 30 GIÂY ---
         // Nếu còn dưới 30s mà có người Bid -> Reset về 30s
@@ -208,7 +291,7 @@ bool RoomManager::placeBid(int roomId, int amount, SocketType bidderSocket,
         // --------------------
 
         outBroadcastMsg = "NEW_BID|" + std::to_string(amount) + "|" +
-                          std::to_string(bidderSocket) + "\n";
+                          getUsername(bidderSocket) + "\n";
         return true;
       }
       return false;
@@ -221,7 +304,11 @@ std::vector<SocketType> RoomManager::getParticipants(int roomId) {
   std::lock_guard<std::recursive_mutex> lock(roomsMutex);
   for (const auto &r : rooms) {
     if (r.id == roomId) {
-      return r.participants;
+      std::vector<SocketType> sockets;
+      for (const auto &p : r.participants) {
+        sockets.push_back(p.socket);
+      }
+      return sockets;
     }
   }
   return {};
@@ -232,15 +319,16 @@ void RoomManager::removeClient(SocketType clientSocket) {
 
   // Xóa khỏi userMap
   if (userMap.count(clientSocket)) {
-    std::cout << "[INFO] User " << userMap[clientSocket] << " disconnected."
-              << std::endl;
+    std::cout << "[INFO] User " << userMap[clientSocket].username
+              << " disconnected." << std::endl;
     userMap.erase(clientSocket);
   }
 
   for (auto &room : rooms) {
-    // Duyệt tìm và xóa socket khỏi vector participants
-    auto it = std::remove(room.participants.begin(), room.participants.end(),
-                          clientSocket);
+    auto it = std::remove_if(room.participants.begin(), room.participants.end(),
+                             [&](const Participant &p) {
+                               return p.socket == clientSocket;
+                             });
 
     if (it != room.participants.end()) {
       room.participants.erase(it, room.participants.end());
@@ -250,16 +338,23 @@ void RoomManager::removeClient(SocketType clientSocket) {
   }
 }
 
-void RoomManager::loginUser(SocketType sock, std::string name) {
+void RoomManager::loginUser(SocketType sock, int userId, std::string name) {
   std::lock_guard<std::recursive_mutex> lock(roomsMutex);
-  userMap[sock] = name;
+  userMap[sock] = {userId, name};
 }
 
 std::string RoomManager::getUsername(SocketType sock) {
   std::lock_guard<std::recursive_mutex> lock(roomsMutex);
   if (userMap.count(sock))
-    return userMap[sock];
+    return userMap[sock].username;
   return "Unknown";
+}
+
+int RoomManager::getUserId(SocketType sock) {
+  std::lock_guard<std::recursive_mutex> lock(roomsMutex);
+  if (userMap.count(sock))
+    return userMap[sock].userId;
+  return -1;
 }
 
 bool RoomManager::leaveRoom(int roomId, SocketType clientSocket) {
@@ -267,9 +362,10 @@ bool RoomManager::leaveRoom(int roomId, SocketType clientSocket) {
 
   for (auto &r : rooms) {
     if (r.id == roomId) {
-      // Tìm và xóa socket khỏi danh sách participants
-      auto it = std::remove(r.participants.begin(), r.participants.end(),
-                            clientSocket);
+      auto it = std::remove_if(r.participants.begin(), r.participants.end(),
+                               [&](const Participant &p) {
+                                 return p.socket == clientSocket;
+                               });
 
       if (it != r.participants.end()) {
         r.participants.erase(it, r.participants.end());
@@ -326,20 +422,20 @@ void RoomManager::updateTimers(BroadcastCallback callback) {
       // --- HẾT GIỜ (TIMEOUT) ---
       // 1. Lưu kết quả
       if (r.highestBidderSocket != -1) {
-        // ... (Lấy participants và Save DB như cũ) ...
-        std::vector<std::string> participants;
-        for (auto s : r.participants) {
-          if (userMap.count(s))
-            participants.push_back(userMap[s]);
+        std::vector<int> participantIds;
+        for (const auto &p : r.participants) {
+          if (p.userId > 0)
+            participantIds.push_back(p.userId);
         }
 
         DatabaseManager::getInstance().saveAuctionResult(
-            r.id, r.itemName, r.currentPrice,
-            std::to_string(r.highestBidderSocket), participants);
+            r.id, r.currentProductId, r.itemName, r.currentPrice,
+            r.highestBidderUserId, participantIds);
 
+        std::string winnerName = getUsername(r.highestBidderSocket);
         std::string soldMsg = "SOLD_ITEM|" + r.itemName + "|" +
                               std::to_string(r.currentPrice) + "|" +
-                              std::to_string(r.highestBidderSocket) + "\n";
+                              winnerName + "\n";
         callback(r.id, soldMsg);
       } else {
         callback(r.id, "Pass_Item|Không ai mua " + r.itemName + "\n");
@@ -360,9 +456,10 @@ void RoomManager::loadState() {
   // counter...)
   if (!rooms.empty()) {
     int maxId = 0;
-    for (const auto &r : rooms) {
+    for (auto &r : rooms) {
       if (r.id > maxId)
         maxId = r.id;
+      r.highestBidderUserId = -1;
       std::cout << "[RECOVERY] Loaded Room " << r.id
                 << " - Item: " << r.itemName << std::endl;
     }

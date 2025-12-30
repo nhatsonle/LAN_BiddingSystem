@@ -22,7 +22,7 @@ std::vector<std::string> split(const std::string &s, char delimiter) {
 }
 
 void AuctionServer::start() {
-  // 1. Tạo Socket & Bind (Code cũ của bạn)
+  // 1. Tạo Socket & Bind
   serverSocket = socket(AF_INET, SOCK_STREAM, 0);
   sockaddr_in serverAddr;
   serverAddr.sin_family = AF_INET;
@@ -85,10 +85,11 @@ std::string AuctionServer::processCommand(SocketType clientSocket,
       return "ERR|MISSING_ARGS";
     std::string u = tokens[1];
     std::string p = tokens[2];
+    int userId = -1;
 
     // GỌI DB ĐỂ CHECK
-    if (DatabaseManager::getInstance().checkLogin(u, p)) {
-      RoomManager::getInstance().loginUser(clientSocket, u);
+    if (DatabaseManager::getInstance().checkLogin(u, p, userId)) {
+      RoomManager::getInstance().loginUser(clientSocket, userId, u);
       return "OK|LOGIN_SUCCESS|Welcome " + u;
     } else {
       return "ERR|LOGIN_FAILED";
@@ -131,6 +132,7 @@ std::string AuctionServer::processCommand(SocketType clientSocket,
           p.startPrice = std::stoi(details[1]);
           p.buyNowPrice = std::stoi(details[2]);
           p.duration = std::stoi(details[3]);
+          p.duration = std::min(p.duration, 1800); // giới hạn 30 phút
 
           // Logic validate cơ bản
           if (p.buyNowPrice > p.startPrice) {
@@ -145,8 +147,14 @@ std::string AuctionServer::processCommand(SocketType clientSocket,
     if (productList.empty())
       return "ERR|NO_VALID_PRODUCTS";
 
-    // Gọi Manager tạo phòng
-    int newId = RoomManager::getInstance().createRoom(roomName, productList);
+    int ownerUserId = RoomManager::getInstance().getUserId(clientSocket);
+    if (ownerUserId <= 0) {
+      return "ERR|NOT_LOGIN";
+    }
+
+    // Gọi Manager tạo phòng, gắn quyền chủ phòng
+    int newId = RoomManager::getInstance().createRoom(
+        roomName, productList, clientSocket, ownerUserId);
     return "OK|ROOM_CREATED|" + std::to_string(newId);
   } else if (cmd == "BUY_NOW") {
     if (tokens.size() < 2)
@@ -197,10 +205,10 @@ std::string AuctionServer::processCommand(SocketType clientSocket,
       return "ERR|MISSING_ARGS";
     int rId = std::stoi(tokens[1]);
     std::string chatMsg = tokens[2];
+    std::string username = RoomManager::getInstance().getUsername(clientSocket);
 
-    // Broadcast chat
-    std::string broadcastMsg =
-        "CHAT|" + std::to_string(clientSocket) + "|" + chatMsg + "\n";
+    // Broadcast chat với username
+    std::string broadcastMsg = "CHAT|" + username + "|" + chatMsg + "\n";
     broadcastToRoom(rId, broadcastMsg);
     return "OK|CHAT_SENT";
   } else if (cmd == "LEAVE_ROOM") { // Client gửi: LEAVE_ROOM|<room_id>

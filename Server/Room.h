@@ -15,6 +15,13 @@ struct Product {
   int duration;
 };
 
+struct Participant {
+  SocketType socket;
+  int userId;
+  std::string username;
+  std::string role;
+};
+
 // 2. Cập nhật cấu trúc Room
 struct Room {
   int id;
@@ -25,6 +32,8 @@ struct Room {
   int currentPrice;
   int buyNowPrice;
   int highestBidderSocket;
+  int highestBidderUserId;
+  int hostUserId;
   int timeLeft;
   int initialDuration;
   // ------------------------------------------------
@@ -32,9 +41,8 @@ struct Room {
   // ------------------------------------------------
 
   bool isClosed;
-  bool isWaitingNextItem; // <-- Thêm biến trạng thái chờ
-  std::vector<SocketType>
-      participants; // Dùng int thay vì SocketType cho đơn giản hóa struct
+  bool isWaitingNextItem; // Trạng thái chờ giữa 2 sản phẩm
+  std::vector<Participant> participants; // Danh sách tham gia kèm role
 
   // --- THÊM HÀNG CHỜ ---
   std::queue<Product> productQueue; // Hàng đợi các sản phẩm tiếp theo

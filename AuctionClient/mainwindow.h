@@ -3,6 +3,7 @@
 
 #include <QMainWindow>
 #include <QTcpSocket> // Thư viện Socket của Qt
+#include <QSet>
 
 QT_BEGIN_NAMESPACE
 namespace Ui {
@@ -32,6 +33,7 @@ private slots:
   void on_btnHistory_clicked();
   void on_txtSearch_textChanged(const QString &arg1);
   void on_btnOpenRegister_clicked();
+  void on_btnQuickBid_clicked();
 
   void on_cboSort_currentIndexChanged(int index);
   void on_btnSendChat_clicked();
@@ -41,6 +43,14 @@ private:
   Ui::MainWindow *ui;
   QTcpSocket *m_socket; // Đối tượng quản lý kết nối
   QString m_username;   // Lưu tên người dùng hiện tại
-  int m_currentRoomId;
+  int m_currentRoomId = -1;
+  int m_currentPriceValue = 0;
+  int m_buyNowPriceValue = 0;
+  QSet<int> m_ownedRoomIds;
+  bool m_isCurrentRoomHost = false;
+
+  void updateRoomActionPermissions();
+  QString formatPrice(int value) const;
+  QString colorizeName(const QString &name) const;
 };
 #endif // MAINWINDOW_H

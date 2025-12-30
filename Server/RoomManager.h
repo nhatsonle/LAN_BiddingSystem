@@ -18,6 +18,11 @@ using SocketType = int;
 // message)
 using BroadcastCallback = std::function<void(int, std::string)>;
 
+struct UserSession {
+  int userId;
+  std::string username;
+};
+
 class RoomManager {
 private:
   std::vector<Room> rooms;
@@ -40,7 +45,8 @@ public:
   void operator=(const RoomManager &) = delete;
 
   // Các hàm nghiệp vụ
-  int createRoom(std::string roomName, std::vector<Product> products);
+  int createRoom(std::string roomName, std::vector<Product> products,
+                 SocketType ownerSocket, int ownerUserId);
   bool joinRoom(int roomId, SocketType clientSocket, std::string &outRoomInfo);
   bool buyNow(int roomId, SocketType buyerSocket, std::string &outMsg,
               BroadcastCallback callback); // Hàm xử lý Bid: Trả về true nếu
@@ -50,22 +56,21 @@ public:
   bool leaveRoom(int roomId, SocketType clientSocket);
   // Lấy danh sách socket trong phòng để gửi tin
   std::vector<SocketType> getParticipants(int roomId);
-  // Định nghĩa kiểu hàm Callback: Nhận vào roomID và nội dung tin nhắn
-  using BroadcastCallback = std::function<void(int roomId, std::string msg)>;
 
   // Hàm cập nhật thời gian (Được gọi mỗi giây)
   void updateTimers(BroadcastCallback callback);
   void removeClient(SocketType clientSocket);
 
   // Quản lý User Login
-  void loginUser(SocketType sock, std::string name);
+  void loginUser(SocketType sock, int userId, std::string name);
   std::string getUsername(SocketType sock);
+  int getUserId(SocketType sock);
 
   // Recovery
   void loadState();
 
 private:
-  std::map<SocketType, std::string> userMap;
+  std::map<SocketType, UserSession> userMap;
 };
 
 #endif

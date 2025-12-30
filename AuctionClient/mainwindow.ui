@@ -285,7 +285,7 @@ QPushButton:hover { background-color: #219150; }</string>
          <rect>
           <x>50</x>
           <y>100</y>
-          <width>101</width>
+          <width>180</width>
           <height>31</height>
          </rect>
         </property>
@@ -318,12 +318,25 @@ QPushButton:hover { background-color: #219150; }</string>
          <rect>
           <x>230</x>
           <y>180</y>
-          <width>83</width>
-          <height>24</height>
+          <width>90</width>
+          <height>28</height>
          </rect>
         </property>
         <property name="text">
          <string>Đặt giá</string>
+        </property>
+       </widget>
+       <widget class="QPushButton" name="btnQuickBid">
+        <property name="geometry">
+         <rect>
+          <x>330</x>
+          <y>180</y>
+          <width>100</width>
+          <height>28</height>
+         </rect>
+        </property>
+        <property name="text">
+         <string>Đặt nhanh</string>
         </property>
        </widget>
        <widget class="QPushButton" name="btnLeave">
@@ -348,10 +361,10 @@ QPushButton:hover { background-color: #c0392b; }</string>
        <widget class="QPushButton" name="btnBuyNow">
         <property name="geometry">
          <rect>
-          <x>350</x>
+          <x>450</x>
           <y>180</y>
-          <width>83</width>
-          <height>24</height>
+          <width>110</width>
+          <height>28</height>
          </rect>
         </property>
         <property name="styleSheet">
@@ -370,7 +383,7 @@ QPushButton:hover { background-color: #d35400; }</string>
          <rect>
           <x>230</x>
           <y>140</y>
-          <width>111</width>
+          <width>180</width>
           <height>21</height>
          </rect>
         </property>
