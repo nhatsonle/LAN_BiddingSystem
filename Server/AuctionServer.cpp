@@ -70,6 +70,7 @@ void AuctionServer::start() {
   }
 }
 
+
 std::string AuctionServer::processCommand(SocketType clientSocket,
                                           const std::string &msg) {
   auto tokens = split(msg, '|');
@@ -77,153 +78,157 @@ std::string AuctionServer::processCommand(SocketType clientSocket,
     return "";
   std::string cmd = tokens[0];
 
-  // --- GỌI QUA ROOM MANAGER ---
-
-  // ... trong processCommand ...
   if (cmd == "LOGIN") { // LOGIN|user|pass
     if (tokens.size() < 3)
       return "ERR|MISSING_ARGS";
     std::string u = tokens[1];
     std::string p = tokens[2];
 
-    // GỌI DB ĐỂ CHECK
     if (DatabaseManager::getInstance().checkLogin(u, p)) {
       RoomManager::getInstance().loginUser(clientSocket, u);
       return "OK|LOGIN_SUCCESS|Welcome " + u;
-    } else {
-      return "ERR|LOGIN_FAILED";
     }
-  } else if (cmd == "REGISTER") { // Client gửi: REGISTER|user|pass
+    return "ERR|LOGIN_FAILED";
+
+  } else if (cmd == "REGISTER") { // REGISTER|user|pass
     if (tokens.size() < 3)
       return "ERR|MISSING_ARGS";
-
     std::string u = tokens[1];
     std::string p = tokens[2];
-
-    // Gọi DB
     if (DatabaseManager::getInstance().registerUser(u, p)) {
       return "OK|REGISTER_SUCCESS";
-    } else {
-      return "ERR|USER_EXISTS"; // Báo lỗi trùng tên
     }
+    return "ERR|USER_EXISTS";
+
   } else if (cmd == "CREATE_ROOM") {
-    // Format: CREATE_ROOM|RoomName|Item1,10,20,30;Item2,5,10,20
+    // CREATE_ROOM|RoomName|Item1,10,20,30;Item2,5,10,20
     if (tokens.size() < 3)
       return "ERR|MISSING_ARGS";
 
     std::string roomName = tokens[1];
-    std::string allProductsStr = tokens[2]; // Chuỗi dài chứa tất cả SP
+    std::string allProductsStr = tokens[2];
 
     std::vector<Product> productList;
 
-    // 1. Tách các sản phẩm bằng dấu chấm phẩy ';'
-    std::vector<std::string> items = split(allProductsStr, ';');
-
+    auto items = split(allProductsStr, ';');
     for (const std::string &itemStr : items) {
-      // 2. Tách chi tiết từng sản phẩm bằng dấu phẩy ','
-      // Format: Name,Start,BuyNow,Duration
-      std::vector<std::string> details = split(itemStr, ',');
-
-      if (details.size() >= 4) {
-        Product p;
-        p.name = details[0];
-        try {
-          p.startPrice = std::stoi(details[1]);
-          p.buyNowPrice = std::stoi(details[2]);
-          p.duration = std::stoi(details[3]);
-
-          // Logic validate cơ bản
-          if (p.buyNowPrice > p.startPrice) {
-            productList.push_back(p);
-          }
-        } catch (...) {
-          continue; // Bỏ qua nếu lỗi format số
-        }
+      auto details = split(itemStr, ',');
+      if (details.size() < 4)
+        continue;
+      Product p;
+      p.name = details[0];
+      try {
+        p.startPrice = std::stoi(details[1]);
+        p.buyNowPrice = std::stoi(details[2]);
+        p.duration = std::stoi(details[3]);
+      } catch (...) {
+        continue;
       }
+      if (p.buyNowPrice > p.startPrice)
+        productList.push_back(p);
     }
 
     if (productList.empty())
       return "ERR|NO_VALID_PRODUCTS";
 
-    // Gọi Manager tạo phòng
     int newId = RoomManager::getInstance().createRoom(roomName, productList);
     return "OK|ROOM_CREATED|" + std::to_string(newId);
-  } else if (cmd == "BUY_NOW") {
+
+  } else if (cmd == "BUY_NOW") { // BUY_NOW|roomId
     if (tokens.size() < 2)
       return "ERR|MISSING_ARGS";
     int rId = std::stoi(tokens[1]);
     std::string broadcastMsg;
 
-    // 1. Tạo một lambda function để làm callback broadcast
-    auto broadcastFunc = [this](int roomId, std::string msg) {
-      this->broadcastToRoom(roomId, msg);
+    auto broadcastFunc = [this](int roomId, std::string m) {
+      this->broadcastToRoom(roomId, m);
     };
 
-    // 2. Gọi hàm buyNow
-    bool success = RoomManager::getInstance().buyNow(
-        rId, clientSocket, broadcastMsg, broadcastFunc);
-
+    bool success = RoomManager::getInstance().buyNow(rId, clientSocket,
+                                                     broadcastMsg, broadcastFunc);
     if (success) {
       return "OK|BUY_SUCCESS";
-    } else {
-      return "ERR|BUY_FAILED";
     }
+    // broadcastMsg có thể là ERR|... (manager set)
+    if (broadcastMsg.rfind("ERR|", 0) == 0) {
+      // trả về dòng đầu (không kèm \n)
+      auto pos = broadcastMsg.find('\n');
+      return broadcastMsg.substr(0, pos == std::string::npos ? broadcastMsg.size() : pos);
+    }
+    return "ERR|BUY_FAILED";
+
   } else if (cmd == "LIST_ROOMS") {
     std::string list = RoomManager::getInstance().getRoomList();
     return "OK|LIST|" + list;
-  } else if (cmd == "JOIN_ROOM") { // JOIN_ROOM|ID
+
+  } else if (cmd == "JOIN_ROOM") { // JOIN_ROOM|roomId
+    if (tokens.size() < 2)
+      return "ERR|MISSING_ARGS";
+    int rId = std::stoi(tokens[1]);
     std::string info;
-    if (RoomManager::getInstance().joinRoom(std::stoi(tokens[1]), clientSocket,
-                                            info)) {
+    if (RoomManager::getInstance().joinRoom(rId, clientSocket, info)) {
+      broadcastToRoom(rId, "USER_COUNT|" +
+                              std::to_string((int)RoomManager::getInstance().getParticipants(rId).size()) +
+                              "\n");
       return "OK|JOINED|" + info;
     }
     return "ERR|ROOM_NOT_FOUND";
-  } else if (cmd == "BID") { // BID|ID|Amount
+
+  } else if (cmd == "LEAVE_ROOM") { // LEAVE_ROOM|roomId
+    if (tokens.size() < 2)
+      return "ERR|MISSING_ARGS";
+    int rId = std::stoi(tokens[1]);
+    if (RoomManager::getInstance().leaveRoom(rId, clientSocket)) {
+      broadcastToRoom(rId, "USER_COUNT|" +
+                              std::to_string((int)RoomManager::getInstance().getParticipants(rId).size()) +
+                              "\n");
+      return "OK|LEFT_ROOM";
+    }
+    return "ERR|ROOM_NOT_FOUND_OR_NOT_IN";
+
+  } else if (cmd == "BID") { // BID|roomId|amount
+    if (tokens.size() < 3)
+      return "ERR|MISSING_ARGS";
     int rId = std::stoi(tokens[1]);
     int amount = std::stoi(tokens[2]);
     std::string broadcastMsg;
 
-    // Gọi hàm placeBid của Manager
-    if (RoomManager::getInstance().placeBid(rId, amount, clientSocket,
-                                            broadcastMsg)) {
-      // Nếu thành công thì Broadcast ngay tại đây
+    if (RoomManager::getInstance().placeBid(rId, amount, clientSocket, broadcastMsg)) {
       broadcastToRoom(rId, broadcastMsg);
       return "OK|BID_SUCCESS|" + std::to_string(amount);
-    } else {
-      return "ERR|PRICE_TOO_LOW";
     }
-  } else if (cmd == "CHAT") { // CHAT|ID|Message
+    // manager trả lỗi cụ thể
+    if (broadcastMsg.rfind("ERR|", 0) == 0) {
+      auto pos = broadcastMsg.find('\n');
+      return broadcastMsg.substr(0, pos == std::string::npos ? broadcastMsg.size() : pos);
+    }
+    return "ERR|PRICE_TOO_LOW";
+
+  } else if (cmd == "CHAT") { // CHAT|roomId|Message
     if (tokens.size() < 3)
       return "ERR|MISSING_ARGS";
     int rId = std::stoi(tokens[1]);
     std::string chatMsg = tokens[2];
+    std::string sender = RoomManager::getInstance().getUsername(clientSocket);
+    if (sender.empty())
+      sender = std::to_string(clientSocket);
 
-    // Broadcast chat
-    std::string broadcastMsg =
-        "CHAT|" + std::to_string(clientSocket) + "|" + chatMsg + "\n";
+    std::string broadcastMsg = "CHAT|" + sender + "|" + chatMsg + "\n";
     broadcastToRoom(rId, broadcastMsg);
     return "OK|CHAT_SENT";
-  } else if (cmd == "LEAVE_ROOM") { // Client gửi: LEAVE_ROOM|<room_id>
-    if (tokens.size() < 2)
-      return "ERR|MISSING_ARGS";
 
-    int rId = std::stoi(tokens[1]);
-    if (RoomManager::getInstance().leaveRoom(rId, clientSocket)) {
-      return "OK|LEFT_ROOM";
-    } else {
-      return "ERR|ROOM_NOT_FOUND_OR_NOT_IN";
-    }
   } else if (cmd == "VIEW_HISTORY") {
     std::string username = RoomManager::getInstance().getUsername(clientSocket);
-    std::string history =
-        DatabaseManager::getInstance().getHistoryList(username);
+    std::string history = DatabaseManager::getInstance().getHistoryList(username);
     return "OK|HISTORY|" + history;
+
   } else if (cmd == "LOGOUT") {
     return "OK|LOGOUT_SUCCESS";
   }
 
   return "ERR|UNKNOWN";
 }
+
 
 void AuctionServer::handleClient(SocketType clientSocket) {
   char buffer[1024];

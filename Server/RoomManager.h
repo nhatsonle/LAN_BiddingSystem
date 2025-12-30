@@ -50,6 +50,9 @@ public:
   bool leaveRoom(int roomId, SocketType clientSocket);
   // Lấy danh sách socket trong phòng để gửi tin
   std::vector<SocketType> getParticipants(int roomId);
+
+  // Lấy tên sản phẩm tiếp theo trong hàng chờ (để hiển thị)
+  std::string getNextItemName(int roomId);
   // Định nghĩa kiểu hàm Callback: Nhận vào roomID và nội dung tin nhắn
   using BroadcastCallback = std::function<void(int roomId, std::string msg)>;
 

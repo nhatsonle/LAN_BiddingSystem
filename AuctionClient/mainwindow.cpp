@@ -356,6 +356,23 @@ void MainWindow::onReadyRead() {
         ui->lblBuyNowPrice->setText(buyNow);
         // -----------------------------
 
+        // Nếu server gửi thêm thông tin (NextItemName, TimeLeft) thì hiển thị
+        if (parts.size() >= 8) {
+          QString nextItem = parts[6];
+          QString timeLeft = parts[7];
+
+          if (!nextItem.isEmpty()) {
+            ui->lblNextItem->setText(nextItem);
+          } else {
+            ui->lblNextItem->setText("(Không có)");
+          }
+          ui->lblTimeLeft->setText(timeLeft + "s");
+        } else {
+          ui->lblNextItem->setText("(Không có)");
+          ui->lblTimeLeft->setText("-");
+        }
+
+
         ui->txtRoomLog->clear();
         ui->txtRoomLog->append("--- Bắt đầu phiên đấu giá ---");
         ui->txtChatLog->clear();
@@ -366,7 +383,7 @@ void MainWindow::onReadyRead() {
     }
 
     // 2. XỬ LÝ KHI CÓ NGƯỜI RA GIÁ (BROADCAST)
-    // Server: NEW_BID|<price>|<user_socket>
+    // Server: NEW_BID|<price>|<username>
     else if (line.startsWith("NEW_BID")) {
       // In ra chuỗi thô để xem có ký tự lạ không
       qDebug() << "1. Raw string received:" << line;
@@ -403,6 +420,11 @@ void MainWindow::onReadyRead() {
     }
     // 1. XỬ LÝ ĐỒNG HỒ ĐẾM NGƯỢC
     // Server: TIME_UPDATE|299
+    else if (line.startsWith("USER_COUNT")) {
+      QString count = line.section('|', 1, 1);
+      ui->lblUserCount->setText(count);
+    }
+
     else if (line.startsWith("TIME_UPDATE")) {
       int seconds = line.section('|', 1, 1).toInt();
 
@@ -436,6 +458,12 @@ void MainWindow::onReadyRead() {
       QMessageBox::critical(
           this, "Lỗi tạo phòng",
           "Server từ chối: Giá mua ngay phải lớn hơn giá khởi điểm.");
+    } else if (line.startsWith("ERR|BID_GE_BUYNOW")) {
+      QMessageBox::warning(this, "Không hợp lệ",
+                           "Giá bid phải nhỏ hơn giá Mua ngay.");
+    } else if (line.startsWith("ERR|BUYNOW_NOT_ALLOWED")) {
+      QMessageBox::warning(this, "Không thể mua ngay",
+                           "Không thể mua ngay khi giá hiện tại đã >= giá Mua ngay.");
     } else if (line.startsWith("ERR|PRICE_TOO_LOW")) {
       QMessageBox::warning(
           this, "Đấu giá thất bại",
@@ -489,6 +517,8 @@ void MainWindow::onReadyRead() {
 
         // 1. Cập nhật UI
         ui->lblRoomName->setText("Đang đấu giá: " + newName);
+        // cập nhật "Sản phẩm tiếp theo" (peek server không gửi ở đây, set tạm)
+        ui->lblNextItem->setText("(Đang tải...)");
         ui->lblCurrentPrice->setText(newPrice);
         ui->lblBuyNowPrice->setText("Mua ngay: " + newBuyNow);
         ui->lcdTimer->display(newDuration);

@@ -34,7 +34,10 @@ struct Room {
   bool isClosed;
   bool isWaitingNextItem; // <-- Thêm biến trạng thái chờ
   std::vector<SocketType>
-      participants; // Dùng int thay vì SocketType cho đơn giản hóa struct
+      participants; // sockets hiện đang trong phòng
+
+  // Lưu username đã từng tham gia/bid (không xoá khi rời phòng)
+  std::vector<std::string> participantUsernames;
 
   // --- THÊM HÀNG CHỜ ---
   std::queue<Product> productQueue; // Hàng đợi các sản phẩm tiếp theo

@@ -378,6 +378,85 @@ QPushButton:hover { background-color: #d35400; }</string>
          <string>0 VND</string>
         </property>
        </widget>
+    <widget class="QLabel" name="labelUserCountTitle">
+     <property name="geometry">
+      <rect>
+       <x>40</x>
+       <y>160</y>
+       <width>120</width>
+       <height>20</height>
+      </rect>
+     </property>
+     <property name="text">
+      <string>Số người:</string>
+     </property>
+    </widget>
+    <widget class="QLabel" name="lblUserCount">
+     <property name="geometry">
+      <rect>
+       <x>160</x>
+       <y>160</y>
+       <width>80</width>
+       <height>20</height>
+      </rect>
+     </property>
+     <property name="text">
+      <string>0</string>
+     </property>
+    </widget>
+    <widget class="QLabel" name="labelNextItemTitle">
+     <property name="geometry">
+      <rect>
+       <x>40</x>
+       <y>190</y>
+       <width>120</width>
+       <height>20</height>
+      </rect>
+     </property>
+     <property name="text">
+      <string>SP tiếp theo:</string>
+     </property>
+    </widget>
+    <widget class="QLabel" name="lblNextItem">
+     <property name="geometry">
+      <rect>
+       <x>160</x>
+       <y>190</y>
+       <width>260</width>
+       <height>20</height>
+      </rect>
+     </property>
+     <property name="text">
+      <string>(Không có)</string>
+     </property>
+    </widget>
+    <widget class="QLabel" name="labelTimeTitle">
+     <property name="geometry">
+      <rect>
+       <x>40</x>
+       <y>220</y>
+       <width>120</width>
+       <height>20</height>
+      </rect>
+     </property>
+     <property name="text">
+      <string>Thời gian:</string>
+     </property>
+    </widget>
+    <widget class="QLabel" name="lblTimeLeft">
+     <property name="geometry">
+      <rect>
+       <x>160</x>
+       <y>220</y>
+       <width>80</width>
+       <height>20</height>
+      </rect>
+     </property>
+     <property name="text">
+      <string>-</string>
+     </property>
+    </widget>
+
        <widget class="QLabel" name="lblCurrentPrice_2">
         <property name="geometry">
          <rect>
