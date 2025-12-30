@@ -257,256 +257,240 @@ QPushButton:hover { background-color: #219150; }</string>
        </widget>
       </widget>
       <widget class="QWidget" name="pageRoom">
-       <widget class="QLabel" name="lblRoomName">
-        <property name="geometry">
-         <rect>
-          <x>50</x>
-          <y>40</y>
-          <width>101</width>
-          <height>16</height>
-         </rect>
-        </property>
-        <property name="text">
-         <string>Tên phòng</string>
-        </property>
-       </widget>
-       <widget class="QLCDNumber" name="lcdTimer">
-        <property name="geometry">
-         <rect>
-          <x>230</x>
-          <y>30</y>
-          <width>191</width>
-          <height>41</height>
-         </rect>
-        </property>
-       </widget>
-       <widget class="QLabel" name="lblCurrentPrice">
-        <property name="geometry">
-         <rect>
-          <x>50</x>
-          <y>100</y>
-          <width>101</width>
-          <height>31</height>
-         </rect>
-        </property>
-        <property name="text">
-         <string>Giá hiện tại</string>
-        </property>
-       </widget>
-       <widget class="QTextBrowser" name="txtRoomLog">
-        <property name="geometry">
-         <rect>
-          <x>50</x>
-          <y>250</y>
-          <width>260</width>
-          <height>220</height>
-         </rect>
-        </property>
-       </widget>
-       <widget class="QLineEdit" name="txtBidAmount">
-        <property name="geometry">
-         <rect>
-          <x>230</x>
-          <y>100</y>
-          <width>113</width>
-          <height>23</height>
-         </rect>
-        </property>
-       </widget>
-       <widget class="QPushButton" name="btnBid">
-        <property name="geometry">
-         <rect>
-          <x>230</x>
-          <y>180</y>
-          <width>83</width>
-          <height>24</height>
-         </rect>
-        </property>
-        <property name="text">
-         <string>Đặt giá</string>
-        </property>
-       </widget>
-       <widget class="QPushButton" name="btnLeave">
-        <property name="geometry">
-         <rect>
-          <x>50</x>
-          <y>480</y>
-          <width>83</width>
-          <height>24</height>
-         </rect>
-        </property>
-        <property name="styleSheet">
-         <string notr="true">QPushButton {
-    background-color: #e74c3c;
-}
-QPushButton:hover { background-color: #c0392b; }</string>
-        </property>
-        <property name="text">
-         <string>Rời phòng</string>
-        </property>
-       </widget>
-       <widget class="QPushButton" name="btnBuyNow">
-        <property name="geometry">
-         <rect>
-          <x>350</x>
-          <y>180</y>
-          <width>83</width>
-          <height>24</height>
-         </rect>
-        </property>
-        <property name="styleSheet">
-         <string notr="true">QPushButton {
-    background-color: #e67e22;
-    font-size: 16px;
-}
-QPushButton:hover { background-color: #d35400; }</string>
-        </property>
-        <property name="text">
-         <string>MUA NGAY</string>
-        </property>
-       </widget>
-       <widget class="QLabel" name="lblBuyNowPrice">
-        <property name="geometry">
-         <rect>
-          <x>230</x>
-          <y>140</y>
-          <width>111</width>
-          <height>21</height>
-         </rect>
-        </property>
-        <property name="text">
-         <string>0 VND</string>
-        </property>
-       </widget>
-    <widget class="QLabel" name="labelUserCountTitle">
-     <property name="geometry">
-      <rect>
-       <x>40</x>
-       <y>160</y>
-       <width>120</width>
-       <height>20</height>
-      </rect>
-     </property>
-     <property name="text">
-      <string>Số người:</string>
-     </property>
-    </widget>
-    <widget class="QLabel" name="lblUserCount">
-     <property name="geometry">
-      <rect>
-       <x>160</x>
-       <y>160</y>
-       <width>80</width>
-       <height>20</height>
-      </rect>
-     </property>
-     <property name="text">
-      <string>0</string>
-     </property>
-    </widget>
-    <widget class="QLabel" name="labelNextItemTitle">
-     <property name="geometry">
-      <rect>
-       <x>40</x>
-       <y>190</y>
-       <width>120</width>
-       <height>20</height>
-      </rect>
-     </property>
-     <property name="text">
-      <string>SP tiếp theo:</string>
-     </property>
-    </widget>
-    <widget class="QLabel" name="lblNextItem">
-     <property name="geometry">
-      <rect>
-       <x>160</x>
-       <y>190</y>
-       <width>260</width>
-       <height>20</height>
-      </rect>
-     </property>
-     <property name="text">
-      <string>(Không có)</string>
-     </property>
-    </widget>
-    <widget class="QLabel" name="labelTimeTitle">
-     <property name="geometry">
-      <rect>
-       <x>40</x>
-       <y>220</y>
-       <width>120</width>
-       <height>20</height>
-      </rect>
-     </property>
-     <property name="text">
-      <string>Thời gian:</string>
-     </property>
-    </widget>
-    <widget class="QLabel" name="lblTimeLeft">
-     <property name="geometry">
-      <rect>
-       <x>160</x>
-       <y>220</y>
-       <width>80</width>
-       <height>20</height>
-      </rect>
-     </property>
-     <property name="text">
-      <string>-</string>
-     </property>
-    </widget>
+ <layout class="QGridLayout" name="gridLayout_roomRoot">
+  <property name="leftMargin"><number>30</number></property>
+  <property name="topMargin"><number>20</number></property>
+  <property name="rightMargin"><number>30</number></property>
+  <property name="bottomMargin"><number>20</number></property>
+  <property name="horizontalSpacing"><number>30</number></property>
+  <property name="verticalSpacing"><number>15</number></property>
 
+  <!-- LEFT: Auction panel -->
+  <item row="0" column="0">
+   <layout class="QVBoxLayout" name="vLayout_left">
+    <property name="spacing"><number>12</number></property>
+
+    <!-- Header: Item + timer -->
+    <item>
+     <layout class="QHBoxLayout" name="hLayout_header">
+      <item>
+       <widget class="QLabel" name="lblRoomName">
+        <property name="text">
+         <string>Đang đấu giá: </string>
+        </property>
+        <property name="minimumSize">
+         <size><width>260</width><height>0</height></size>
+        </property>
+       </widget>
+      </item>
+      <item>
+       <spacer name="horizontalSpacer_header">
+        <property name="orientation"><enum>Qt::Horizontal</enum></property>
+        <property name="sizeHint" stdset="0">
+         <size><width>40</width><height>20</height></size>
+        </property>
+       </spacer>
+      </item>
+      <item>
+       <widget class="QLCDNumber" name="lcdTimer">
+        <property name="minimumSize">
+         <size><width>220</width><height>60</height></size>
+        </property>
+        <property name="digitCount"><number>2</number></property>
+       </widget>
+      </item>
+     </layout>
+    </item>
+
+    <!-- Info grid -->
+    <item>
+     <layout class="QGridLayout" name="gridLayout_info">
+      <property name="horizontalSpacing"><number>12</number></property>
+      <property name="verticalSpacing"><number>10</number></property>
+
+      <item row="0" column="0">
        <widget class="QLabel" name="lblCurrentPrice_2">
-        <property name="geometry">
-         <rect>
-          <x>50</x>
-          <y>140</y>
-          <width>101</width>
-          <height>31</height>
-         </rect>
-        </property>
-        <property name="text">
-         <string>Giá mua ngay</string>
-        </property>
+        <property name="text"><string>Giá bid hiện tại</string></property>
        </widget>
-       <widget class="QLineEdit" name="txtChatInput">
-        <property name="geometry">
-         <rect>
-          <x>330</x>
-          <y>400</y>
-          <width>200</width>
-          <height>25</height>
-         </rect>
-        </property>
+      </item>
+      <item row="0" column="1">
+       <widget class="QLabel" name="lblCurrentPrice">
+        <property name="text"><string>0</string></property>
+        <property name="styleSheet"><string>font-weight: 600;</string></property>
+       </widget>
+      </item>
+
+      <item row="1" column="0">
+       <widget class="QLabel" name="labelBuyNowTitle">
+        <property name="text"><string>Giá mua ngay</string></property>
+       </widget>
+      </item>
+      <item row="1" column="1">
+       <widget class="QLabel" name="lblBuyNowPrice">
+        <property name="text"><string>0</string></property>
+        <property name="styleSheet"><string>font-weight: 600;</string></property>
+       </widget>
+      </item>
+
+      <item row="2" column="0">
+       <widget class="QLabel" name="labelUserCountTitle">
+        <property name="text"><string>Số người</string></property>
+       </widget>
+      </item>
+      <item row="2" column="1">
+       <widget class="QLabel" name="lblUserCount">
+        <property name="text"><string>0</string></property>
+       </widget>
+      </item>
+
+      <item row="3" column="0">
+       <widget class="QLabel" name="labelNextItemTitle">
+        <property name="text"><string>SP tiếp theo</string></property>
+       </widget>
+      </item>
+      <item row="3" column="1">
+       <widget class="QLabel" name="lblNextItem">
+        <property name="text"><string>(Không có)</string></property>
+       </widget>
+      </item>
+
+      <item row="4" column="0">
+       <widget class="QLabel" name="labelTimeTitle">
+        <property name="text"><string>Thời gian</string></property>
+       </widget>
+      </item>
+      <item row="4" column="1">
+       <widget class="QLabel" name="lblTimeLeft">
+        <property name="text"><string>0s</string></property>
+       </widget>
+      </item>
+
+      <item row="5" column="0">
+       <widget class="QLabel" name="labelBidInputTitle">
+        <property name="text"><string>Nhập giá</string></property>
+       </widget>
+      </item>
+      <item row="5" column="1">
+       <widget class="QLineEdit" name="txtBidAmount">
         <property name="placeholderText">
-         <string>Nhập tin nhắn...</string>
+         <string>Ví dụ: 120000</string>
         </property>
        </widget>
+      </item>
+     </layout>
+    </item>
+
+    <!-- Action buttons -->
+    <item>
+     <layout class="QHBoxLayout" name="hLayout_actions">
+      <item>
+       <widget class="QPushButton" name="btnBid">
+        <property name="text"><string>Đặt giá</string></property>
+        <property name="styleSheet"><string>background:#3daee9; color:white; padding:6px 14px; border-radius:6px;</string></property>
+       </widget>
+      </item>
+      <item>
+       <widget class="QPushButton" name="btnBuyNow">
+        <property name="text"><string>MUA NGAY</string></property>
+        <property name="styleSheet"><string>background:#f39c12; color:white; padding:6px 14px; border-radius:6px; font-weight:600;</string></property>
+       </widget>
+      </item>
+      <item>
+       <spacer name="horizontalSpacer_actions">
+        <property name="orientation"><enum>Qt::Horizontal</enum></property>
+        <property name="sizeHint" stdset="0">
+         <size><width>40</width><height>20</height></size>
+        </property>
+       </spacer>
+      </item>
+     </layout>
+    </item>
+
+    <!-- Room log -->
+    <item>
+     <widget class="QTextEdit" name="txtRoomLog">
+      <property name="readOnly"><bool>true</bool></property>
+      <property name="minimumSize">
+       <size><width>520</width><height>220</height></size>
+      </property>
+     </widget>
+    </item>
+
+    <!-- Leave -->
+    <item>
+     <layout class="QHBoxLayout" name="hLayout_leave">
+      <item>
+       <widget class="QPushButton" name="btnLeave">
+        <property name="text"><string>Rời phòng</string></property>
+        <property name="styleSheet"><string>background:#e74c3c; color:white; padding:6px 14px; border-radius:6px;</string></property>
+       </widget>
+      </item>
+      <item>
+       <spacer name="horizontalSpacer_leave">
+        <property name="orientation"><enum>Qt::Horizontal</enum></property>
+        <property name="sizeHint" stdset="0">
+         <size><width>40</width><height>20</height></size>
+        </property>
+       </spacer>
+      </item>
+     </layout>
+    </item>
+
+   </layout>
+  </item>
+
+  <!-- RIGHT: Chat panel -->
+  <item row="0" column="1">
+   <layout class="QVBoxLayout" name="vLayout_chat">
+    <property name="spacing"><number>10</number></property>
+
+    <item>
+     <widget class="QLabel" name="labelChatTitle">
+      <property name="text"><string>=== Chat phòng ===</string></property>
+      <property name="alignment"><set>Qt::AlignHCenter|Qt::AlignVCenter</set></property>
+     </widget>
+    </item>
+
+    <item>
+     <widget class="QTextEdit" name="txtChatLog">
+      <property name="readOnly"><bool>true</bool></property>
+      <property name="minimumSize">
+       <size><width>380</width><height>260</height></size>
+      </property>
+     </widget>
+    </item>
+
+    <item>
+     <layout class="QHBoxLayout" name="hLayout_chatInput">
+      <item>
+       <widget class="QLineEdit" name="txtChatInput">
+        <property name="placeholderText"><string>Nhập tin nhắn...</string></property>
+       </widget>
+      </item>
+      <item>
        <widget class="QPushButton" name="btnSendChat">
-        <property name="geometry">
-         <rect>
-          <x>540</x>
-          <y>397</y>
-          <width>90</width>
-          <height>31</height>
-         </rect>
-        </property>
-        <property name="text">
-         <string>Gửi chat</string>
-        </property>
+        <property name="text"><string>Gửi chat</string></property>
+        <property name="styleSheet"><string>background:#3daee9; color:white; padding:6px 14px; border-radius:6px;</string></property>
        </widget>
-       <widget class="QTextBrowser" name="txtChatLog">
-        <property name="geometry">
-         <rect>
-          <x>330</x>
-          <y>250</y>
-          <width>300</width>
-          <height>130</height>
-         </rect>
-        </property>
-       </widget>
-      </widget>
+      </item>
+     </layout>
+    </item>
+
+    <item>
+     <spacer name="verticalSpacer_chat">
+      <property name="orientation"><enum>Qt::Vertical</enum></property>
+      <property name="sizeHint" stdset="0">
+       <size><width>20</width><height>40</height></size>
+      </property>
+     </spacer>
+    </item>
+
+   </layout>
+  </item>
+
+ </layout>
+</widget>
+
      </widget>
     </item>
    </layout>
