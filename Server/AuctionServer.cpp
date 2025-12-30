@@ -183,7 +183,13 @@ std::string AuctionServer::processCommand(SocketType clientSocket,
     std::string info;
     if (RoomManager::getInstance().joinRoom(std::stoi(tokens[1]), clientSocket,
                                             info)) {
-      return "OK|JOINED|" + info;
+      // Broadcast thông báo vào phòng
+      std::string username =
+          RoomManager::getInstance().getUsername(clientSocket);
+      std::string joinMsg = "CHAT|" + username + "|đã tham gia phòng\n";
+      broadcastToRoom(std::stoi(tokens[1]), joinMsg);
+      // Trả về thêm 1 dòng chat để chính người tham gia cũng thấy trong log
+      return "OK|JOINED|" + info + "\n" + joinMsg;
     }
     return "ERR|ROOM_NOT_FOUND";
   } else if (cmd == "BID") { // BID|ID|Amount

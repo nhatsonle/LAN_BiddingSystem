@@ -46,7 +46,11 @@ int RoomManager::createRoom(std::string roomName, std::vector<Product> products,
   newRoom.timeLeft = cappedFirstDuration;
   newRoom.highestBidderSocket = -1;
   newRoom.highestBidderUserId = -1;
+  newRoom.highestBidderName = "";
+  if (userMap.count(ownerSocket))
+    newRoom.hostName = userMap[ownerSocket].username;
   newRoom.hostUserId = ownerUserId;
+  newRoom.bidCount = 0;
   newRoom.isClosed = false;
   newRoom.isWaitingNextItem = false;
 
@@ -92,6 +96,8 @@ bool RoomManager::loadNextProduct(Room &r) {
   r.timeLeft = cappedDuration; // Reset thời gian
   r.highestBidderSocket = -1;  // Reset người thắng
   r.highestBidderUserId = -1;
+  r.highestBidderName = "";
+  r.bidCount = 0;
   r.isWaitingNextItem = false; // <-- Đảm bảo reset trạng thái
 
   std::cout << "[QUEUE] Switched to next item: " << r.itemName << std::endl;
@@ -221,9 +227,27 @@ bool RoomManager::joinRoom(int roomId, SocketType clientSocket,
                                                      p.role);
       }
 
+      std::string participantNames;
+      int participantCount = static_cast<int>(r.participants.size());
+
+      // Next product preview
+      std::string nextName = "-";
+      int nextStart = 0;
+      int nextDuration = 0;
+      if (!r.productQueue.empty()) {
+        const Product &nxt = r.productQueue.front();
+        nextName = nxt.name;
+        nextStart = nxt.startPrice;
+        nextDuration = nxt.duration;
+      }
+
       outRoomInfo = std::to_string(r.id) + "|" + r.itemName + "|" +
                     std::to_string(r.currentPrice) + "|" +
-                    std::to_string(r.buyNowPrice); // <-- Thêm cái này
+                    std::to_string(r.buyNowPrice) + "|" + r.hostName + "|" +
+                    r.highestBidderName + "|" + std::to_string(r.bidCount) + "|" +
+                    std::to_string(participantCount) + "|" + nextName + "|" +
+                    std::to_string(nextStart) + "|" +
+                    std::to_string(nextDuration);
       // -------------------------
 
       return true;
@@ -248,6 +272,8 @@ bool RoomManager::placeBid(int roomId, int amount, SocketType bidderSocket,
         r.currentPrice = r.buyNowPrice;
         r.highestBidderSocket = bidderSocket;
         r.highestBidderUserId = bidderUserId;
+        r.highestBidderName = getUsername(bidderSocket);
+        r.bidCount += 1;
         r.timeLeft = 0;
 
         // Lưu DB
@@ -261,7 +287,7 @@ bool RoomManager::placeBid(int roomId, int amount, SocketType bidderSocket,
             r.highestBidderUserId, participantIds);
 
         std::string soldMsg = "SOLD|" + std::to_string(r.currentPrice) + "|" +
-                              getUsername(bidderSocket) + "\n";
+                              r.highestBidderName + "\n";
 
         if (loadNextProduct(r)) {
           std::string nextMsg =
@@ -282,6 +308,8 @@ bool RoomManager::placeBid(int roomId, int amount, SocketType bidderSocket,
         r.currentPrice = amount;
         r.highestBidderSocket = bidderSocket;
         r.highestBidderUserId = bidderUserId;
+        r.highestBidderName = getUsername(bidderSocket);
+        r.bidCount += 1;
 
         // --- LUẬT 30 GIÂY ---
         // Nếu còn dưới 30s mà có người Bid -> Reset về 30s
@@ -291,7 +319,8 @@ bool RoomManager::placeBid(int roomId, int amount, SocketType bidderSocket,
         // --------------------
 
         outBroadcastMsg = "NEW_BID|" + std::to_string(amount) + "|" +
-                          getUsername(bidderSocket) + "\n";
+                          r.highestBidderName + "|" + std::to_string(r.bidCount) +
+                          "\n";
         return true;
       }
       return false;
@@ -432,7 +461,7 @@ void RoomManager::updateTimers(BroadcastCallback callback) {
             r.id, r.currentProductId, r.itemName, r.currentPrice,
             r.highestBidderUserId, participantIds);
 
-        std::string winnerName = getUsername(r.highestBidderSocket);
+        std::string winnerName = r.highestBidderName;
         std::string soldMsg = "SOLD_ITEM|" + r.itemName + "|" +
                               std::to_string(r.currentPrice) + "|" +
                               winnerName + "\n";

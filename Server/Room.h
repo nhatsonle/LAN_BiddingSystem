@@ -33,6 +33,9 @@ struct Room {
   int buyNowPrice;
   int highestBidderSocket;
   int highestBidderUserId;
+  std::string highestBidderName;
+  std::string hostName;
+  int bidCount = 0;
   int hostUserId;
   int timeLeft;
   int initialDuration;
