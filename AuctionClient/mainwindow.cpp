@@ -506,18 +506,44 @@ void MainWindow::onReadyRead() {
       } else {
         ui->lcdTimer->setStyleSheet("color: black;"); // Mặc định
       }
+    } else if (line.startsWith("TIME_ALERT")) {
+      int sec = line.section('|', 1, 1).toInt();
+      ui->txtRoomLog->append(
+          "<span style=\"color:#e67e22;\">Cảnh báo: còn " +
+          QString::number(sec) + " giây.</span>");
     }
 
-    // 2. XỬ LÝ KẾT THÚC PHIÊN (SOLD)
-    // Server: SOLD|<price>|<winner_socket>
-    else if (line.startsWith("SOLD")) {
-      QString price = line.section('|', 1, 1);
-      QString winner = line.section('|', 2, 2);
+    // 2. XỬ LÝ KẾT THÚC PHIÊN (SOLD / SOLD_ITEM)
+    else if (line.startsWith("SOLD_ITEM")) {
+      // SOLD_ITEM|itemName|price|winner
+      QStringList parts = line.split('|');
+      if (parts.size() >= 4) {
+        QString item = parts[1];
+        int priceVal = parts[2].toInt();
+        QString winner = parts[3];
+        ui->txtRoomLog->append("--- KẾT THÚC ---");
+        ui->txtRoomLog->append("Sản phẩm " + item + " đã thuộc về " +
+                               colorizeName(winner) + " với giá " +
+                               formatPrice(priceVal));
+      }
+    } else if (line.startsWith("SOLD|")) {
+      QString priceTok = line.section('|', 1, 1);
+      QString winnerTok = line.section('|', 2, 2);
+      bool okPrice = false;
+      int priceVal = priceTok.toInt(&okPrice);
+      if (!okPrice) {
+        bool okAlt = false;
+        int altPrice = winnerTok.toInt(&okAlt);
+        if (okAlt) {
+          priceVal = altPrice;
+          winnerTok = priceTok;
+        }
+      }
 
       ui->lcdTimer->display(0);
       ui->txtRoomLog->append("--- KẾT THÚC ---");
-      ui->txtRoomLog->append("Sản phẩm đã thuộc về User " + winner +
-                             " với giá " + formatPrice(price.toInt()));
+      ui->txtRoomLog->append("Sản phẩm đã thuộc về " + colorizeName(winnerTok) +
+                             " với giá " + formatPrice(priceVal));
 
       QMessageBox::information(this, "Kết thúc", "Sản phẩm đã được bán!");
 

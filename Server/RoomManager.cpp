@@ -274,7 +274,8 @@ bool RoomManager::placeBid(int roomId, int amount, SocketType bidderSocket,
         r.currentPrice = r.buyNowPrice;
         r.highestBidderSocket = bidderSocket;
         r.highestBidderUserId = bidderUserId;
-        r.highestBidderName = getUsername(bidderSocket);
+        if (r.highestBidderName.empty())
+          r.highestBidderName = getUsername(bidderSocket);
         r.bidCount += 1;
         r.timeLeft = 0;
 
@@ -310,7 +311,8 @@ bool RoomManager::placeBid(int roomId, int amount, SocketType bidderSocket,
         r.currentPrice = amount;
         r.highestBidderSocket = bidderSocket;
         r.highestBidderUserId = bidderUserId;
-        r.highestBidderName = getUsername(bidderSocket);
+        if (r.highestBidderName.empty())
+          r.highestBidderName = getUsername(bidderSocket);
         r.bidCount += 1;
 
         // --- LUẬT 30 GIÂY ---
@@ -449,6 +451,10 @@ void RoomManager::updateTimers(BroadcastCallback callback) {
     if (r.timeLeft > 0) {
       std::string msg = "TIME_UPDATE|" + std::to_string(r.timeLeft) + "\n";
       callback(r.id, msg);
+      if (r.timeLeft == 30) {
+        std::string alert = "TIME_ALERT|30\n";
+        callback(r.id, alert);
+      }
     } else {
       // --- HẾT GIỜ (TIMEOUT) ---
       // 1. Lưu kết quả
@@ -459,6 +465,8 @@ void RoomManager::updateTimers(BroadcastCallback callback) {
             participantIds.push_back(p.userId);
         }
 
+        if (r.highestBidderName.empty())
+          r.highestBidderName = getUsername(r.highestBidderSocket);
         DatabaseManager::getInstance().saveAuctionResult(
             r.id, r.currentProductId, r.itemName, r.currentPrice,
             r.highestBidderUserId, participantIds);
