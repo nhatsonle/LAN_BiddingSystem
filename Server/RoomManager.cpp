@@ -122,6 +122,7 @@ bool RoomManager::buyNow(int roomId, SocketType buyerSocket,
       r.currentPrice = r.buyNowPrice; // Giá chốt = Giá mua ngay
       r.highestBidderSocket = buyerSocket;
       r.highestBidderUserId = buyerUserId;
+      r.highestBidderName = getUsername(buyerSocket);
       r.timeLeft = 0; // Dừng đồng hồ sản phẩm này
 
       // Chuẩn bị tin nhắn SOLD để trả về ngay cho người gọi (và broadcast)
@@ -271,11 +272,11 @@ bool RoomManager::placeBid(int roomId, int amount, SocketType bidderSocket,
         return false; // chủ phòng không được bid
       // Nếu giá bid chạm/qua giá mua ngay -> xử lý mua ngay
       if (amount >= r.buyNowPrice) {
+        std::string bidderName = getUsername(bidderSocket);
         r.currentPrice = r.buyNowPrice;
         r.highestBidderSocket = bidderSocket;
         r.highestBidderUserId = bidderUserId;
-        if (r.highestBidderName.empty())
-          r.highestBidderName = getUsername(bidderSocket);
+        r.highestBidderName = bidderName;
         r.bidCount += 1;
         r.timeLeft = 0;
 
@@ -290,7 +291,7 @@ bool RoomManager::placeBid(int roomId, int amount, SocketType bidderSocket,
             r.highestBidderUserId, participantIds);
 
         std::string soldMsg = "SOLD|" + std::to_string(r.currentPrice) + "|" +
-                              r.highestBidderName + "\n";
+                              bidderName + "\n";
 
         if (loadNextProduct(r)) {
           std::string nextMsg =
@@ -308,11 +309,11 @@ bool RoomManager::placeBid(int roomId, int amount, SocketType bidderSocket,
       }
       // Yêu cầu: Giá mới phải cao hơn hoặc bằng giá cũ + 10.000
       if (amount >= r.currentPrice + 10000) {
+        std::string bidderName = getUsername(bidderSocket);
         r.currentPrice = amount;
         r.highestBidderSocket = bidderSocket;
         r.highestBidderUserId = bidderUserId;
-        if (r.highestBidderName.empty())
-          r.highestBidderName = getUsername(bidderSocket);
+        r.highestBidderName = bidderName;
         r.bidCount += 1;
 
         // --- LUẬT 30 GIÂY ---
@@ -323,7 +324,7 @@ bool RoomManager::placeBid(int roomId, int amount, SocketType bidderSocket,
         // --------------------
 
         outBroadcastMsg = "NEW_BID|" + std::to_string(amount) + "|" +
-                          r.highestBidderName + "|" + std::to_string(r.bidCount) +
+                          bidderName + "|" + std::to_string(r.bidCount) +
                           "\n";
         return true;
       }
