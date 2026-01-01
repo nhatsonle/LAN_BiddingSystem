@@ -19,23 +19,26 @@ public:
 
   // Xử lý User
   bool registerUser(const std::string &username, const std::string &password);
-  bool checkLogin(const std::string &username, const std::string &password);
+  bool checkLogin(const std::string &username, const std::string &password,
+                  int &outUserId);
 
   // Lưu lịch sử đấu giá (Thêm danh sách người tham gia)
-  void saveAuctionResult(int roomId, const std::string &itemName,
-                         int finalPrice, const std::string &winner,
-                         const std::vector<std::string> &participants);
+  void saveAuctionResult(int roomId, int productId, const std::string &itemName,
+                         int finalPrice, int winnerUserId,
+                         const std::vector<int> &participantUserIds);
 
   // Hàm lấy chuỗi danh sách lịch sử theo user
   std::string getHistoryList(const std::string &username);
 
   // --- Room & Product Management ---
   // --- Room & Product Management ---
-  int createRoom(const std::string &name);
+  int createRoom(const std::string &name, int createdByUserId = -1);
   int saveProduct(int roomId, const std::string &name, int startPrice,
                   int buyNowPrice, int duration);
   void updateRoomStatus(int roomId, const std::string &status);
   void updateProductStatus(int productId, const std::string &status);
+  void addRoomMember(int roomId, int userId,
+                     const std::string &role = "BIDDER");
 
   // Recovery
   std::vector<Room> loadOpenRooms();

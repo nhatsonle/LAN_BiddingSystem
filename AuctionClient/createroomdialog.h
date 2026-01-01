@@ -27,6 +27,7 @@ public:
     ~CreateRoomDialog();
 
     QString getRoomName() const;
+    QString getStartTimeString() const;
     std::vector<ProductInfo> getProductList() const;
 
 private slots:
