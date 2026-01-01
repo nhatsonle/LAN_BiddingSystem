@@ -56,20 +56,6 @@ int RoomManager::createRoom(std::string roomName, std::vector<Product> products,
   newRoom.isClosed = false;
   newRoom.isWaitingNextItem = false;
 
-  // Gắn chủ phòng với role HOST nếu có thông tin user/sock
-  if (ownerUserId > 0 && ownerSocket != -1) {
-    Participant host;
-    host.socket = ownerSocket;
-    host.userId = ownerUserId;
-    if (userMap.count(ownerSocket)) {
-      host.username = userMap[ownerSocket].username;
-    }
-    host.role = "HOST";
-    newRoom.participants.push_back(host);
-    DatabaseManager::getInstance().addRoomMember(newRoom.id, ownerUserId,
-                                                 host.role);
-  }
-
   // --- ĐẨY CÁC SẢN PHẨM CÒN LẠI VÀO QUEUE ---
   for (size_t i = 1; i < productsWithId.size(); ++i) {
     newRoom.productQueue.push(productsWithId[i]);
@@ -223,7 +209,7 @@ bool RoomManager::joinRoom(int roomId, SocketType clientSocket,
         p.socket = clientSocket;
         p.userId = session.userId;
         p.username = session.username;
-        p.role = "BIDDER";
+        p.role = (session.userId == r.hostUserId) ? "HOST" : "BIDDER";
         r.participants.push_back(p);
 
         DatabaseManager::getInstance().addRoomMember(roomId, session.userId,
