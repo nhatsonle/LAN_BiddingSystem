@@ -442,7 +442,9 @@ void MainWindow::onReadyRead() {
         updateRoomInfoUI(host, leader, bidCount, participants, nextName,
                          nextStart, nextDuration);
 
-        m_isCurrentRoomHost = m_ownedRoomIds.contains(m_currentRoomId);
+        // Quyết định quyền host dựa vào hostName do server trả về,
+        // tránh mất dấu khi danh sách owned bị reset (logout/restart).
+        m_isCurrentRoomHost = (host == m_username);
         updateRoomActionPermissions();
 
         ui->stackedWidget->setCurrentIndex(2);
