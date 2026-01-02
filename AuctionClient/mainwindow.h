@@ -2,8 +2,8 @@
 #define MAINWINDOW_H
 
 #include <QMainWindow>
-#include <QTcpSocket> // Thư viện Socket của Qt
 #include <QSet>
+#include <QTcpSocket> // Thư viện Socket của Qt
 
 QT_BEGIN_NAMESPACE
 namespace Ui {
@@ -18,6 +18,12 @@ public:
   MainWindow(QWidget *parent = nullptr);
   ~MainWindow();
 
+  // Public method for dialogs to send commands
+  void sendRequest(const QString &cmd);
+
+  // Friend class to allow backward access if needed
+  friend class ProfileDialog;
+
 private slots:
   void onConnected();
   void onReadyRead();
@@ -30,7 +36,7 @@ private slots:
   void on_btnCreateRoom_clicked();
   void on_btnBid_clicked();
   void on_btnBuyNow_clicked();
-  void on_btnHistory_clicked();
+  void on_btnProfile_clicked();
   void on_txtSearch_textChanged(const QString &arg1);
   void on_btnOpenRegister_clicked();
   void on_btnQuickBid_clicked();
@@ -52,8 +58,9 @@ private:
   void updateRoomActionPermissions();
   QString formatPrice(int value) const;
   QString colorizeName(const QString &name) const;
-  void updateRoomInfoUI(const QString &host, const QString &leader, int bidCount,
-                        const QString &participants, const QString &nextName,
-                        int nextStart, int nextDuration);
+  void updateRoomInfoUI(const QString &host, const QString &leader,
+                        int bidCount, const QString &participants,
+                        const QString &nextName, int nextStart,
+                        int nextDuration);
 };
 #endif // MAINWINDOW_H

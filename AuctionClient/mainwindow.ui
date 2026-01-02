@@ -188,7 +188,7 @@ QPushButton:hover { background-color: #219150; }</string>
          <string>Vào phòng</string>
         </property>
        </widget>
-       <widget class="QPushButton" name="btnHistory">
+       <widget class="QPushButton" name="btnProfile">
         <property name="geometry">
          <rect>
           <x>380</x>
@@ -198,7 +198,7 @@ QPushButton:hover { background-color: #219150; }</string>
          </rect>
         </property>
         <property name="text">
-         <string>Lịch sử</string>
+         <string>Cá nhân</string>
         </property>
        </widget>
        <widget class="QLineEdit" name="txtSearch">

@@ -12,17 +12,20 @@ SOURCES += \
     createroomdialog.cpp \
     main.cpp \
     mainwindow.cpp \
-    registerdialog.cpp
+    registerdialog.cpp \
+    profiledialog.cpp
 
 HEADERS += \
     createroomdialog.h \
     mainwindow.h \
-    registerdialog.h
+    registerdialog.h \
+    profiledialog.h
 
 FORMS += \
     createroomdialog.ui \
     mainwindow.ui \
-    registerdialog.ui
+    registerdialog.ui \
+    profiledialog.ui
 
 # Default rules for deployment.
 qnx: target.path = /tmp/$${TARGET}/bin
