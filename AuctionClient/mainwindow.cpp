@@ -530,6 +530,7 @@ void MainWindow::onReadyRead() {
         ui->txtRoomLog->append("Sản phẩm " + item + " đã thuộc về " +
                                colorizeName(winner) + " với giá " +
                                formatPrice(priceVal));
+        qDebug() << "Client: Sold Item:" << item << priceVal << winner;
       }
     } else if (line.startsWith("SOLD|")) {
       QString priceTok = line.section('|', 1, 1);

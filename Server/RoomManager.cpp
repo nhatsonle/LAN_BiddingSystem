@@ -113,7 +113,7 @@ bool RoomManager::buyNow(int roomId, SocketType buyerSocket,
 
       // Chuẩn bị tin nhắn SOLD để trả về ngay cho người gọi (và broadcast)
       outMsg = "SOLD|" + std::to_string(r.buyNowPrice) + "|" +
-               std::to_string(buyerSocket) + "\n";
+               r.highestBidderName + "\n";
 
       // Nếu có callback (Server gửi broadcast), gửi thông báo SOLD ngay lập tức
       if (callback) {
@@ -469,6 +469,7 @@ void RoomManager::updateTimers(BroadcastCallback callback) {
                               std::to_string(r.currentPrice) + "|" +
                               winnerName + "\n";
         callback(r.id, soldMsg);
+        std::cout << "winner name: " << winnerName << std::endl;
       } else {
         callback(r.id, "Pass_Item|Không ai mua " + r.itemName + "\n");
       }
