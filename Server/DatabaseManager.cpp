@@ -57,16 +57,15 @@ bool DatabaseManager::init(const std::string &dbName) {
   }
 
   // 3. Tạo bảng Rooms
-  const char *sqlRooms =
-      "CREATE TABLE IF NOT EXISTS rooms ("
-      "id INTEGER PRIMARY KEY AUTOINCREMENT,"
-      "name TEXT NOT NULL,"
-      "status TEXT DEFAULT 'OPEN',"
-      "created_by INTEGER,"
-      "start_time DATETIME DEFAULT CURRENT_TIMESTAMP,"
-      "created_at DATETIME DEFAULT CURRENT_TIMESTAMP,"
-      "closed_at DATETIME,"
-      "FOREIGN KEY(created_by) REFERENCES users(id));";
+  const char *sqlRooms = "CREATE TABLE IF NOT EXISTS rooms ("
+                         "id INTEGER PRIMARY KEY AUTOINCREMENT,"
+                         "name TEXT NOT NULL,"
+                         "status TEXT DEFAULT 'OPEN',"
+                         "created_by INTEGER,"
+                         "start_time DATETIME DEFAULT CURRENT_TIMESTAMP,"
+                         "created_at DATETIME DEFAULT CURRENT_TIMESTAMP,"
+                         "closed_at DATETIME,"
+                         "FOREIGN KEY(created_by) REFERENCES users(id));";
   rc = sqlite3_exec(db, sqlRooms, 0, 0, &zErrMsg);
   if (rc != SQLITE_OK) {
     std::cerr << "SQL error (Create Rooms): " << zErrMsg << std::endl;
@@ -74,16 +73,15 @@ bool DatabaseManager::init(const std::string &dbName) {
   }
 
   // 4. Tạo bảng Products
-  const char *sqlProducts =
-      "CREATE TABLE IF NOT EXISTS products ("
-      "id INTEGER PRIMARY KEY AUTOINCREMENT,"
-      "room_id INTEGER NOT NULL,"
-      "name TEXT NOT NULL,"
-      "start_price INTEGER NOT NULL,"
-      "buy_now_price INTEGER,"
-      "duration INTEGER NOT NULL,"
-      "status TEXT DEFAULT 'WAITING',"
-      "FOREIGN KEY(room_id) REFERENCES rooms(id));";
+  const char *sqlProducts = "CREATE TABLE IF NOT EXISTS products ("
+                            "id INTEGER PRIMARY KEY AUTOINCREMENT,"
+                            "room_id INTEGER NOT NULL,"
+                            "name TEXT NOT NULL,"
+                            "start_price INTEGER NOT NULL,"
+                            "buy_now_price INTEGER,"
+                            "duration INTEGER NOT NULL,"
+                            "status TEXT DEFAULT 'WAITING',"
+                            "FOREIGN KEY(room_id) REFERENCES rooms(id));";
   rc = sqlite3_exec(db, sqlProducts, 0, 0, &zErrMsg);
   if (rc != SQLITE_OK) {
     std::cerr << "SQL error (Create Products): " << zErrMsg << std::endl;
@@ -91,18 +89,17 @@ bool DatabaseManager::init(const std::string &dbName) {
   }
 
   // 5. Tạo bảng History
-  const char *sqlHistory =
-      "CREATE TABLE IF NOT EXISTS history ("
-      "id INTEGER PRIMARY KEY AUTOINCREMENT,"
-      "room_id INTEGER,"
-      "product_id INTEGER,"
-      "item_name TEXT,"
-      "final_price INTEGER,"
-      "winner_user_id INTEGER,"
-      "timestamp DATETIME DEFAULT CURRENT_TIMESTAMP,"
-      "FOREIGN KEY(room_id) REFERENCES rooms(id),"
-      "FOREIGN KEY(product_id) REFERENCES products(id),"
-      "FOREIGN KEY(winner_user_id) REFERENCES users(id));";
+  const char *sqlHistory = "CREATE TABLE IF NOT EXISTS history ("
+                           "id INTEGER PRIMARY KEY AUTOINCREMENT,"
+                           "room_id INTEGER,"
+                           "product_id INTEGER,"
+                           "item_name TEXT,"
+                           "final_price INTEGER,"
+                           "winner_user_id INTEGER,"
+                           "timestamp DATETIME DEFAULT CURRENT_TIMESTAMP,"
+                           "FOREIGN KEY(room_id) REFERENCES rooms(id),"
+                           "FOREIGN KEY(product_id) REFERENCES products(id),"
+                           "FOREIGN KEY(winner_user_id) REFERENCES users(id));";
 
   rc = sqlite3_exec(db, sqlHistory, 0, 0, &zErrMsg);
   if (rc != SQLITE_OK) {
@@ -141,15 +138,14 @@ bool DatabaseManager::init(const std::string &dbName) {
   }
 
   // 8. Tạo bảng Room Members (role)
-  const char *sqlRoomMembers =
-      "CREATE TABLE IF NOT EXISTS room_members ("
-      "room_id INTEGER,"
-      "user_id INTEGER,"
-      "role TEXT NOT NULL DEFAULT 'BIDDER',"
-      "joined_at DATETIME DEFAULT CURRENT_TIMESTAMP,"
-      "PRIMARY KEY(room_id, user_id),"
-      "FOREIGN KEY(room_id) REFERENCES rooms(id),"
-      "FOREIGN KEY(user_id) REFERENCES users(id));";
+  const char *sqlRoomMembers = "CREATE TABLE IF NOT EXISTS room_members ("
+                               "room_id INTEGER,"
+                               "user_id INTEGER,"
+                               "role TEXT NOT NULL DEFAULT 'BIDDER',"
+                               "joined_at DATETIME DEFAULT CURRENT_TIMESTAMP,"
+                               "PRIMARY KEY(room_id, user_id),"
+                               "FOREIGN KEY(room_id) REFERENCES rooms(id),"
+                               "FOREIGN KEY(user_id) REFERENCES users(id));";
   rc = sqlite3_exec(db, sqlRoomMembers, 0, 0, &zErrMsg);
   if (rc != SQLITE_OK) {
     std::cerr << "SQL error (Create Room Members): " << zErrMsg << std::endl;
@@ -203,10 +199,9 @@ void DatabaseManager::saveAuctionResult(
   // 1. Insert into history
   std::string sql = "INSERT INTO history (room_id, product_id, item_name, "
                     "final_price, winner_user_id) VALUES (" +
-                    std::to_string(roomId) + ", " +
-                    std::to_string(productId) + ", '" + itemName + "', " +
-                    std::to_string(finalPrice) + ", " +
-                    std::to_string(winnerUserId) + ");";
+                    std::to_string(roomId) + ", " + std::to_string(productId) +
+                    ", '" + itemName + "', " + std::to_string(finalPrice) +
+                    ", " + std::to_string(winnerUserId) + ");";
 
   int rc = sqlite3_exec(db, sql.c_str(), 0, 0, &zErrMsg);
 
@@ -241,8 +236,9 @@ std::string DatabaseManager::getHistoryList(const std::string &username) {
       "JOIN users u ON ap.user_id = u.id "
       "LEFT JOIN users w ON h.winner_user_id = w.id "
       "WHERE u.username = '" +
-      username + "' "
-                 "ORDER BY h.id DESC LIMIT 10;";
+      username +
+      "' "
+      "ORDER BY h.id DESC LIMIT 10;";
 
   char *zErrMsg = 0;
   std::cout << "[DB] Executing History for " << username << std::endl;
@@ -254,6 +250,66 @@ std::string DatabaseManager::getHistoryList(const std::string &username) {
     sqlite3_free(zErrMsg);
   }
 
+  return list;
+}
+
+// --- User Profile ---
+
+bool DatabaseManager::checkPassword(int userId, const std::string &password) {
+  int count = 0;
+  std::string sql = "SELECT id FROM users WHERE id=" + std::to_string(userId) +
+                    " AND password='" + password + "';";
+  char *zErrMsg = 0;
+  // create a temp callback or reuse loginCallback? loginCallback expects int*
+  auto cb = [](void *data, int argc, char **argv, char **col) -> int {
+    int *c = (int *)data;
+    (*c)++;
+    return 0;
+  };
+  sqlite3_exec(db, sql.c_str(), cb, &count, &zErrMsg);
+  if (zErrMsg)
+    sqlite3_free(zErrMsg);
+  return count > 0;
+}
+
+bool DatabaseManager::updatePassword(int userId,
+                                     const std::string &newPassword) {
+  std::string sql = "UPDATE users SET password='" + newPassword +
+                    "' WHERE id=" + std::to_string(userId) + ";";
+  char *zErrMsg = 0;
+  int rc = sqlite3_exec(db, sql.c_str(), 0, 0, &zErrMsg);
+  if (rc != SQLITE_OK) {
+    if (zErrMsg)
+      sqlite3_free(zErrMsg);
+    return false;
+  }
+  return true;
+}
+
+std::string DatabaseManager::getWonItems(const std::string &username) {
+  // Format: ItemName:Price:Date;...
+  std::string list = "";
+  // Query bảng history, filter winner=username (thông qua JOIN users)
+  // FIX: winner_user_id is int, need to join users table
+  std::string sql = "SELECT h.item_name, h.final_price, h.timestamp "
+                    "FROM history h "
+                    "JOIN users u ON h.winner_user_id = u.id "
+                    "WHERE u.username='" +
+                    username + "' ORDER BY h.id DESC;";
+
+  auto cb = [](void *data, int argc, char **argv, char **col) -> int {
+    std::string *res = (std::string *)data;
+    std::string item = argv[0] ? argv[0] : "";
+    std::string price = argv[1] ? argv[1] : "0";
+    std::string time = argv[2] ? argv[2] : "";
+    *res += item + ":" + price + ":" + time + ";";
+    return 0;
+  };
+
+  char *zErrMsg = 0;
+  sqlite3_exec(db, sql.c_str(), cb, &list, &zErrMsg);
+  if (zErrMsg)
+    sqlite3_free(zErrMsg);
   return list;
 }
 

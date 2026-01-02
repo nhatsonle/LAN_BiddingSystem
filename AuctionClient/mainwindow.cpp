@@ -1,5 +1,6 @@
 #include "mainwindow.h"
 #include "createroomdialog.h"
+#include "profiledialog.h" // <-- Added here
 #include "registerdialog.h"
 #include "ui_mainwindow.h"
 #include <QDebug>
@@ -273,8 +274,6 @@ void MainWindow::on_btnBuyNow_clicked() {
     m_socket->write(QString("BUY_NOW|%1\n").arg(m_currentRoomId).toUtf8());
   }
 }
-
-void MainWindow::on_btnHistory_clicked() { m_socket->write("VIEW_HISTORY\n"); }
 
 void MainWindow::on_btnSendChat_clicked() {
   if (m_socket->state() != QAbstractSocket::ConnectedState)
@@ -578,25 +577,29 @@ void MainWindow::onReadyRead() {
           this, "Cảnh báo đăng nhập",
           "Tài khoản này đang trực tuyến ở một thiết bị khác.\n"
           "Không thể đăng nhập cùng lúc.");
-    } else if (line.startsWith("OK|HISTORY")) {
-      QString data =
-          line.section('|', 2, 2); // Lấy phần dữ liệu sau OK|HISTORY|
-      QStringList items = data.split(';', Qt::SkipEmptyParts);
-
-      QString displayMsg = "=== CÁC PHIÊN ĐẤU GIÁ ĐÃ KẾT THÚC ===\n\n";
-      for (const QString &item : items) {
-        QStringList details = item.split(':');
-        if (details.size() >= 3) {
-          displayMsg += QString("Vật phẩm: %1\nGiá chốt: %2 VND\nNgười thắng: "
-                                "%3\n----------------\n")
-                            .arg(details[0], details[1], details[2]);
-        }
+    } else if (line.startsWith("OK|PASS_CHANGED")) {
+      // Tìm Dialog đang mở (nếu có)
+      ProfileDialog *dlg = this->findChild<ProfileDialog *>();
+      if (dlg && dlg->isVisible()) {
+        dlg->onChangePassResult(true, "Đổi mật khẩu thành công!");
       }
-
-      if (items.isEmpty())
-        displayMsg += "(Chưa có dữ liệu)";
-
-      QMessageBox::information(this, "Lịch sử đấu giá", displayMsg);
+    } else if (line.startsWith("ERR|WRONG_PASS")) {
+      ProfileDialog *dlg = this->findChild<ProfileDialog *>();
+      if (dlg && dlg->isVisible()) {
+        dlg->onChangePassResult(false, "Mật khẩu cũ không đúng.");
+      }
+    } else if (line.startsWith("OK|WON_LIST")) {
+      QString data = line.section('|', 2);
+      ProfileDialog *dlg = this->findChild<ProfileDialog *>();
+      if (dlg && dlg->isVisible()) {
+        dlg->updateWonList(data);
+      }
+    } else if (line.startsWith("OK|HISTORY")) {
+      QString data = line.section('|', 2);
+      ProfileDialog *dlg = this->findChild<ProfileDialog *>();
+      if (dlg && dlg->isVisible()) {
+        dlg->updateHistory(data);
+      }
     } else if (line.startsWith("OK|REGISTER_SUCCESS")) {
       QMessageBox::information(
           this, "Thành công",
@@ -767,5 +770,20 @@ void MainWindow::updateRoomInfoUI(const QString &host, const QString &leader,
   } else {
     ui->lblNextInfo->setText(nextName + " | " + formatPrice(nextStart) + " | " +
                              QString::number(nextDuration) + "s");
+  }
+}
+
+// --- User Profile ---
+
+void MainWindow::on_btnProfile_clicked() {
+  ProfileDialog dlg(this, this);
+  dlg.exec(); // Modal dialog
+}
+
+void MainWindow::sendRequest(const QString &cmd) {
+  if (m_socket->state() == QAbstractSocket::ConnectedState) {
+    m_socket->write(cmd.toUtf8());
+  } else {
+    QMessageBox::warning(this, "Lỗi", "Chưa kết nối Server.");
   }
 }

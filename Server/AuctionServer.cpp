@@ -237,6 +237,40 @@ std::string AuctionServer::processCommand(SocketType clientSocket,
     std::string history =
         DatabaseManager::getInstance().getHistoryList(username);
     return "OK|HISTORY|" + history;
+  } else if (cmd == "CHANGE_PASS") { // CHANGE_PASS|old|new
+    if (tokens.size() < 3)
+      return "ERR|MISSING_ARGS";
+    std::string oldPass = tokens[1];
+    std::string newPass = tokens[2];
+
+    int userId = RoomManager::getInstance().getUserId(clientSocket);
+    if (userId == -1)
+      return "ERR|NOT_LOGGED_IN";
+
+    if (DatabaseManager::getInstance().checkPassword(userId, oldPass)) {
+      if (DatabaseManager::getInstance().updatePassword(userId, newPass)) {
+        return "OK|PASS_CHANGED";
+      } else {
+        return "ERR|DB_ERROR";
+      }
+    } else {
+      return "ERR|WRONG_PASS";
+    }
+  } else if (cmd == "GET_WON") {
+    std::string username = RoomManager::getInstance().getUsername(clientSocket);
+    if (username.empty())
+      return "ERR|NOT_LOGGED_IN";
+
+    std::string list = DatabaseManager::getInstance().getWonItems(username);
+    return "OK|WON_LIST|" + list;
+  } else if (cmd == "GET_HISTORY") {
+    std::string username = RoomManager::getInstance().getUsername(clientSocket);
+    if (username.empty())
+      return "ERR|NOT_LOGGED_IN";
+
+    std::string history =
+        DatabaseManager::getInstance().getHistoryList(username);
+    return "OK|HISTORY|" + history;
   } else if (cmd == "LOGOUT") {
     return "OK|LOGOUT_SUCCESS";
   }

@@ -30,6 +30,11 @@ public:
   // Hàm lấy chuỗi danh sách lịch sử theo user
   std::string getHistoryList(const std::string &username);
 
+  // --- User Profile ---
+  bool checkPassword(int userId, const std::string &password);
+  bool updatePassword(int userId, const std::string &newPassword);
+  std::string getWonItems(const std::string &username);
+
   // --- Room & Product Management ---
   // --- Room & Product Management ---
   int createRoom(const std::string &name, int createdByUserId = -1);
