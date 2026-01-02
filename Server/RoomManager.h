@@ -65,6 +65,7 @@ public:
   void loginUser(SocketType sock, int userId, std::string name);
   std::string getUsername(SocketType sock);
   int getUserId(SocketType sock);
+  bool isUserLoggedIn(const std::string &username); // Check duplicate login
 
   // Recovery
   void loadState();

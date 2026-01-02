@@ -200,10 +200,9 @@ bool RoomManager::joinRoom(int roomId, SocketType clientSocket,
   for (auto &r : rooms) {
     if (r.id == roomId) {
       // tránh nhân bản socket
-      auto it = std::find_if(r.participants.begin(), r.participants.end(),
-                             [&](const Participant &p) {
-                               return p.socket == clientSocket;
-                             });
+      auto it = std::find_if(
+          r.participants.begin(), r.participants.end(),
+          [&](const Participant &p) { return p.socket == clientSocket; });
       if (it == r.participants.end()) {
         Participant p;
         p.socket = clientSocket;
@@ -233,12 +232,22 @@ bool RoomManager::joinRoom(int roomId, SocketType clientSocket,
       outRoomInfo = std::to_string(r.id) + "|" + r.itemName + "|" +
                     std::to_string(r.currentPrice) + "|" +
                     std::to_string(r.buyNowPrice) + "|" + r.hostName + "|" +
-                    r.highestBidderName + "|" + std::to_string(r.bidCount) + "|" +
-                    std::to_string(participantCount) + "|" + nextName + "|" +
-                    std::to_string(nextStart) + "|" +
+                    r.highestBidderName + "|" + std::to_string(r.bidCount) +
+                    "|" + std::to_string(participantCount) + "|" + nextName +
+                    "|" + std::to_string(nextStart) + "|" +
                     std::to_string(nextDuration);
       // -------------------------
 
+      return true;
+    }
+  }
+  return false;
+}
+
+bool RoomManager::isUserLoggedIn(const std::string &username) {
+  std::lock_guard<std::recursive_mutex> lock(roomsMutex);
+  for (const auto &pair : userMap) {
+    if (pair.second.username == username) {
       return true;
     }
   }
@@ -276,14 +285,14 @@ bool RoomManager::placeBid(int roomId, int amount, SocketType bidderSocket,
             r.id, r.currentProductId, r.itemName, r.currentPrice,
             r.highestBidderUserId, participantIds);
 
-        std::string soldMsg = "SOLD|" + std::to_string(r.currentPrice) + "|" +
-                              bidderName + "\n";
+        std::string soldMsg =
+            "SOLD|" + std::to_string(r.currentPrice) + "|" + bidderName + "\n";
 
         if (loadNextProduct(r)) {
-          std::string nextMsg =
-              "NEXT_ITEM|" + r.itemName + "|" + std::to_string(r.currentPrice) +
-              "|" + std::to_string(r.buyNowPrice) + "|" +
-              std::to_string(r.initialDuration) + "\n";
+          std::string nextMsg = "NEXT_ITEM|" + r.itemName + "|" +
+                                std::to_string(r.currentPrice) + "|" +
+                                std::to_string(r.buyNowPrice) + "|" +
+                                std::to_string(r.initialDuration) + "\n";
           outBroadcastMsg = soldMsg + nextMsg;
           r.isClosed = false;
         } else {
@@ -310,8 +319,7 @@ bool RoomManager::placeBid(int roomId, int amount, SocketType bidderSocket,
         // --------------------
 
         outBroadcastMsg = "NEW_BID|" + std::to_string(amount) + "|" +
-                          bidderName + "|" + std::to_string(r.bidCount) +
-                          "\n";
+                          bidderName + "|" + std::to_string(r.bidCount) + "\n";
         return true;
       }
       return false;
@@ -345,10 +353,9 @@ void RoomManager::removeClient(SocketType clientSocket) {
   }
 
   for (auto &room : rooms) {
-    auto it = std::remove_if(room.participants.begin(), room.participants.end(),
-                             [&](const Participant &p) {
-                               return p.socket == clientSocket;
-                             });
+    auto it = std::remove_if(
+        room.participants.begin(), room.participants.end(),
+        [&](const Participant &p) { return p.socket == clientSocket; });
 
     if (it != room.participants.end()) {
       room.participants.erase(it, room.participants.end());
@@ -382,10 +389,9 @@ bool RoomManager::leaveRoom(int roomId, SocketType clientSocket) {
 
   for (auto &r : rooms) {
     if (r.id == roomId) {
-      auto it = std::remove_if(r.participants.begin(), r.participants.end(),
-                               [&](const Participant &p) {
-                                 return p.socket == clientSocket;
-                               });
+      auto it = std::remove_if(
+          r.participants.begin(), r.participants.end(),
+          [&](const Participant &p) { return p.socket == clientSocket; });
 
       if (it != r.participants.end()) {
         r.participants.erase(it, r.participants.end());
