@@ -87,6 +87,11 @@ std::string AuctionServer::processCommand(SocketType clientSocket,
     std::string p = tokens[2];
     int userId = -1;
 
+    // CHECK DUPLICATE LOGIN
+    if (RoomManager::getInstance().isUserLoggedIn(u)) {
+      return "ERR|ALREADY_LOGGED_IN|Account is already active";
+    }
+
     // GỌI DB ĐỂ CHECK
     if (DatabaseManager::getInstance().checkLogin(u, p, userId)) {
       RoomManager::getInstance().loginUser(clientSocket, userId, u);

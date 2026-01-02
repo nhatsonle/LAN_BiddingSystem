@@ -26,8 +26,9 @@ MainWindow::~MainWindow() { delete ui; }
 
 void MainWindow::on_btnBid_clicked() {
   if (m_isCurrentRoomHost) {
-    QMessageBox::warning(this, "Không hợp lệ",
-                         "Chủ phòng không được phép đấu giá trong phòng của mình.");
+    QMessageBox::warning(
+        this, "Không hợp lệ",
+        "Chủ phòng không được phép đấu giá trong phòng của mình.");
     return;
   }
   // 1. Lấy giá hiện tại từ giao diện (bóc tách từ chuỗi hiển thị hoặc lưu biến
@@ -38,11 +39,11 @@ void MainWindow::on_btnBid_clicked() {
 
   // Chặn đặt giá cao hơn giá mua ngay -> hỏi chuyển sang mua ngay
   if (m_buyNowPriceValue > 0 && bidAmount >= m_buyNowPriceValue) {
-    auto res = QMessageBox::question(
-        this, "Xác nhận mua ngay",
-        "Giá bạn nhập đã chạm/qua giá MUA NGAY.\n"
-        "Bạn có muốn mua ngay với giá " + formatPrice(m_buyNowPriceValue) +
-            " ?");
+    auto res =
+        QMessageBox::question(this, "Xác nhận mua ngay",
+                              "Giá bạn nhập đã chạm/qua giá MUA NGAY.\n"
+                              "Bạn có muốn mua ngay với giá " +
+                                  formatPrice(m_buyNowPriceValue) + " ?");
     if (res == QMessageBox::Yes) {
       QString cmd = QString("BUY_NOW|%1\n").arg(m_currentRoomId);
       m_socket->write(cmd.toUtf8());
@@ -67,8 +68,9 @@ void MainWindow::on_btnBid_clicked() {
 
 void MainWindow::on_btnQuickBid_clicked() {
   if (m_isCurrentRoomHost) {
-    QMessageBox::warning(this, "Không hợp lệ",
-                         "Chủ phòng không được phép đấu giá trong phòng của mình.");
+    QMessageBox::warning(
+        this, "Không hợp lệ",
+        "Chủ phòng không được phép đấu giá trong phòng của mình.");
     return;
   }
   int currentPrice = m_currentPriceValue;
@@ -77,11 +79,11 @@ void MainWindow::on_btnQuickBid_clicked() {
 
   // Chặn đặt giá cao hơn giá mua ngay -> hỏi chuyển sang mua ngay
   if (m_buyNowPriceValue > 0 && bidAmount >= m_buyNowPriceValue) {
-    auto res = QMessageBox::question(
-        this, "Xác nhận mua ngay",
-        "Giá Đặt nhanh sẽ chạm/qua giá MUA NGAY.\n"
-        "Bạn có muốn mua ngay với giá " + formatPrice(m_buyNowPriceValue) +
-            " ?");
+    auto res =
+        QMessageBox::question(this, "Xác nhận mua ngay",
+                              "Giá Đặt nhanh sẽ chạm/qua giá MUA NGAY.\n"
+                              "Bạn có muốn mua ngay với giá " +
+                                  formatPrice(m_buyNowPriceValue) + " ?");
     if (res == QMessageBox::Yes) {
       QString cmd = QString("BUY_NOW|%1\n").arg(m_currentRoomId);
       m_socket->write(cmd.toUtf8());
@@ -255,8 +257,9 @@ void MainWindow::on_btnJoin_clicked() {
 
 void MainWindow::on_btnBuyNow_clicked() {
   if (m_isCurrentRoomHost) {
-    QMessageBox::warning(this, "Không hợp lệ",
-                         "Chủ phòng không được phép mua sản phẩm trong phòng của mình.");
+    QMessageBox::warning(
+        this, "Không hợp lệ",
+        "Chủ phòng không được phép mua sản phẩm trong phòng của mình.");
     return;
   }
   // Hiển thị hộp thoại xác nhận cho chắc ăn
@@ -409,7 +412,8 @@ void MainWindow::onReadyRead() {
     else if (line.startsWith("OK|JOINED")) {
       QStringList parts = line.split('|');
 
-      // Server gửi: OK|JOINED|ID|Name|CurrentPrice|BuyNowPrice|Host|Leader|BidCount|ParticipantCount|NextName|NextStart|NextDuration
+      // Server gửi:
+      // OK|JOINED|ID|Name|CurrentPrice|BuyNowPrice|Host|Leader|BidCount|ParticipantCount|NextName|NextStart|NextDuration
       if (parts.size() >= 12) {
         m_currentRoomId = parts[2].toInt();
         QString name = parts[3];
@@ -475,8 +479,8 @@ void MainWindow::onReadyRead() {
         ui->lblCurrentPrice->setText(formatPrice(newPrice));
 
         QString coloredName = colorizeName(userName);
-        ui->txtRoomLog->append(coloredName + " trả giá: " +
-                               formatPrice(newPrice));
+        ui->txtRoomLog->append(coloredName +
+                               " trả giá: " + formatPrice(newPrice));
         ui->lblBidCount->setText(QString::number(bidCount));
         ui->lblLeader->setText(coloredName);
 
@@ -510,9 +514,8 @@ void MainWindow::onReadyRead() {
       }
     } else if (line.startsWith("TIME_ALERT")) {
       int sec = line.section('|', 1, 1).toInt();
-      ui->txtRoomLog->append(
-          "<span style=\"color:#e67e22;\">Cảnh báo: còn " +
-          QString::number(sec) + " giây.</span>");
+      ui->txtRoomLog->append("<span style=\"color:#e67e22;\">Cảnh báo: còn " +
+                             QString::number(sec) + " giây.</span>");
     }
 
     // 2. XỬ LÝ KẾT THÚC PHIÊN (SOLD / SOLD_ITEM)
@@ -527,6 +530,7 @@ void MainWindow::onReadyRead() {
         ui->txtRoomLog->append("Sản phẩm " + item + " đã thuộc về " +
                                colorizeName(winner) + " với giá " +
                                formatPrice(priceVal));
+        qDebug() << "Client: Sold Item:" << item << priceVal << winner;
       }
     } else if (line.startsWith("SOLD|")) {
       QString priceTok = line.section('|', 1, 1);
@@ -569,6 +573,11 @@ void MainWindow::onReadyRead() {
       QMessageBox::critical(this, "Đăng nhập thất bại",
                             "Tài khoản hoặc mật khẩu không chính xác!\n"
                             "Vui lòng kiểm tra lại hoặc Đăng ký mới.");
+    } else if (line.startsWith("ERR|ALREADY_LOGGED_IN")) {
+      QMessageBox::warning(
+          this, "Cảnh báo đăng nhập",
+          "Tài khoản này đang trực tuyến ở một thiết bị khác.\n"
+          "Không thể đăng nhập cùng lúc.");
     } else if (line.startsWith("OK|HISTORY")) {
       QString data =
           line.section('|', 2, 2); // Lấy phần dữ liệu sau OK|HISTORY|
@@ -603,28 +612,28 @@ void MainWindow::onReadyRead() {
       QStringList parts = line.split('|');
       if (parts.size() >= 5) {
         QString newName = parts[1];
-      int newPrice = parts[2].toInt();
-      int newBuyNow = parts[3].toInt();
-      int newDuration = parts[4].toInt();
+        int newPrice = parts[2].toInt();
+        int newBuyNow = parts[3].toInt();
+        int newDuration = parts[4].toInt();
 
-      // 1. Cập nhật UI
+        // 1. Cập nhật UI
         ui->lblRoomName->setText("Đang đấu giá: " + newName);
         ui->lblItemName->setText("Sản phẩm: " + newName);
-      m_currentPriceValue = newPrice;
-      m_buyNowPriceValue = newBuyNow;
-      ui->lblCurrentPrice->setText(formatPrice(newPrice));
-      ui->lblBuyNowPrice->setText(formatPrice(newBuyNow));
-      ui->lcdTimer->display(newDuration);
+        m_currentPriceValue = newPrice;
+        m_buyNowPriceValue = newBuyNow;
+        ui->lblCurrentPrice->setText(formatPrice(newPrice));
+        ui->lblBuyNowPrice->setText(formatPrice(newBuyNow));
+        ui->lcdTimer->display(newDuration);
 
-      // 2. Thông báo chuyển đổi
-      ui->txtRoomLog->append("\n------------------------------");
-      ui->txtRoomLog->append(">>> CHUYỂN SANG SẢN PHẨM TIẾP THEO <<<");
-      ui->txtRoomLog->append("Sản phẩm: " + newName);
-      ui->txtRoomLog->append("Giá khởi điểm: " + formatPrice(newPrice));
-      ui->lblLeader->setText("-");
-      ui->lblBidCount->setText("0");
-      ui->lblNextInfo->setText("-");
-      ui->lblParticipants->setText("-");
+        // 2. Thông báo chuyển đổi
+        ui->txtRoomLog->append("\n------------------------------");
+        ui->txtRoomLog->append(">>> CHUYỂN SANG SẢN PHẨM TIẾP THEO <<<");
+        ui->txtRoomLog->append("Sản phẩm: " + newName);
+        ui->txtRoomLog->append("Giá khởi điểm: " + formatPrice(newPrice));
+        ui->lblLeader->setText("-");
+        ui->lblBidCount->setText("0");
+        ui->lblNextInfo->setText("-");
+        ui->lblParticipants->setText("-");
 
         // 3. Reset các nút (nếu bị disable do sold trước đó)
         ui->btnBid->setEnabled(true);
@@ -649,14 +658,14 @@ void MainWindow::onReadyRead() {
     }
     // ...
 
-  // 3. XỬ LÝ KHÔNG AI MUA (CLOSED)
-  else if (line.startsWith("CLOSED")) {
-    ui->lcdTimer->display(0);
-    ui->txtRoomLog->append("--- KẾT THÚC ---");
-    ui->txtRoomLog->append("Không có ai đấu giá. Phiên bị hủy.");
-    ui->btnBid->setEnabled(false);
-    ui->btnQuickBid->setEnabled(false);
-  }
+    // 3. XỬ LÝ KHÔNG AI MUA (CLOSED)
+    else if (line.startsWith("CLOSED")) {
+      ui->lcdTimer->display(0);
+      ui->txtRoomLog->append("--- KẾT THÚC ---");
+      ui->txtRoomLog->append("Không có ai đấu giá. Phiên bị hủy.");
+      ui->btnBid->setEnabled(false);
+      ui->btnQuickBid->setEnabled(false);
+    }
   }
 }
 
@@ -736,7 +745,7 @@ void MainWindow::updateRoomActionPermissions() {
 
 QString MainWindow::formatPrice(int value) const {
   QLocale vn(QLocale::Vietnamese);
-    return vn.toString(value) + " VND";
+  return vn.toString(value) + " VND";
 }
 
 QString MainWindow::colorizeName(const QString &name) const {
