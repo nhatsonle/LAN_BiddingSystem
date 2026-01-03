@@ -1,5 +1,8 @@
 #include "DatabaseManager.h"
 #include <algorithm>
+#include <chrono>
+#include <ctime>
+#include <iomanip>
 #include <sstream>
 
 static std::string escapeSqlString(const std::string &input) {
@@ -21,6 +24,23 @@ static std::string sanitizeProtocolField(const std::string &input) {
     }
   }
   return out;
+}
+
+static bool parseStartTime(const std::string &input,
+                           std::chrono::system_clock::time_point &out) {
+  if (input.empty())
+    return false;
+  std::tm tm = {};
+  std::istringstream ss(input);
+  ss >> std::get_time(&tm, "%Y-%m-%d %H:%M:%S");
+  if (ss.fail())
+    return false;
+  tm.tm_isdst = -1;
+  std::time_t timeVal = std::mktime(&tm);
+  if (timeVal == -1)
+    return false;
+  out = std::chrono::system_clock::from_time_t(timeVal);
+  return true;
 }
 
 // Callback dùng để lấy userId khi login
@@ -335,14 +355,27 @@ std::string DatabaseManager::getWonItems(const std::string &username) {
   return list;
 }
 
-int DatabaseManager::createRoom(const std::string &name, int createdByUserId) {
+int DatabaseManager::createRoom(const std::string &name, int createdByUserId,
+                                const std::string &startTime) {
   std::string sql;
   std::string safeName = escapeSqlString(name);
+  std::string safeStart = startTime.empty() ? "" : escapeSqlString(startTime);
   if (createdByUserId > 0) {
-    sql = "INSERT INTO rooms (name, created_by) VALUES ('" + safeName + "', " +
-          std::to_string(createdByUserId) + ");";
+    if (!safeStart.empty()) {
+      sql = "INSERT INTO rooms (name, created_by, start_time) VALUES ('" +
+            safeName + "', " + std::to_string(createdByUserId) + ", '" +
+            safeStart + "');";
+    } else {
+      sql = "INSERT INTO rooms (name, created_by) VALUES ('" + safeName + "', " +
+            std::to_string(createdByUserId) + ");";
+    }
   } else {
-    sql = "INSERT INTO rooms (name) VALUES ('" + safeName + "');";
+    if (!safeStart.empty()) {
+      sql = "INSERT INTO rooms (name, start_time) VALUES ('" + safeName +
+            "', '" + safeStart + "');";
+    } else {
+      sql = "INSERT INTO rooms (name) VALUES ('" + safeName + "');";
+    }
   }
   char *zErrMsg = 0;
   int rc = sqlite3_exec(db, sql.c_str(), 0, 0, &zErrMsg);
@@ -441,6 +474,7 @@ struct RoomData {
   std::string name;
   int hostUserId;
   std::string hostName;
+  std::string startTime;
 };
 struct ProdData {
   int id;
@@ -466,13 +500,14 @@ std::vector<Room> DatabaseManager::loadOpenRooms() {
     r.name = (argv[1] ? argv[1] : "");
     r.hostUserId = argv[2] ? std::stoi(argv[2]) : -1;
     r.hostName = (argv[3] ? argv[3] : "N/A");
+    r.startTime = (argc > 4 && argv[4]) ? argv[4] : "";
     list->push_back(r);
     return 0;
   };
 
   std::string sqlRooms =
       "SELECT r.id, r.name, COALESCE(r.created_by, -1), "
-      "COALESCE(u.username,'N/A') "
+      "COALESCE(u.username,'N/A'), COALESCE(r.start_time, '') "
       "FROM rooms r LEFT JOIN users u ON r.created_by = u.id "
       "WHERE r.status='OPEN';";
   sqlite3_exec(db, sqlRooms.c_str(), cbRoom, &roomList, &zErrMsg);
@@ -488,6 +523,17 @@ std::vector<Room> DatabaseManager::loadOpenRooms() {
     room.id = rd.id;
     room.hostName = rd.hostName;
     room.hostUserId = rd.hostUserId;
+    room.startTimeString = rd.startTime;
+    room.hasStartTime = false;
+    room.isWaitingForStart = false;
+    if (!rd.startTime.empty()) {
+      std::chrono::system_clock::time_point tp;
+      if (parseStartTime(rd.startTime, tp)) {
+        room.hasStartTime = true;
+        room.startTime = tp;
+        room.isWaitingForStart = !room.hasStarted();
+      }
+    }
     room.isClosed = false;
     room.isWaitingNextItem = false;
     room.currentProductId = -1;

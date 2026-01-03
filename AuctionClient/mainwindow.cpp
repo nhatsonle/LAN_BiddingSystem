@@ -30,6 +30,11 @@ MainWindow::MainWindow(QWidget *parent)
   m_socket = new QTcpSocket(this);
   connect(m_socket, &QTcpSocket::connected, this, &MainWindow::onConnected);
   connect(m_socket, &QTcpSocket::readyRead, this, &MainWindow::onReadyRead);
+  m_roomStartTimer = new QTimer(this);
+  m_roomStartTimer->setInterval(1000);
+  connect(m_roomStartTimer, &QTimer::timeout, this,
+          &MainWindow::onRoomStartTimeout);
+  resetRoomStartState();
 
   // Mặc định hiển thị trang Login (Index 0)
   ui->stackedWidget->setCurrentIndex(0);
@@ -44,6 +49,11 @@ void MainWindow::on_btnBid_clicked() {
     QMessageBox::warning(
         this, "Không hợp lệ",
         "Chủ phòng không được phép đấu giá trong phòng của mình.");
+    return;
+  }
+  if (!m_roomStartReached) {
+    ui->txtRoomLog->append(
+        "<span style=\"color:#e67e22;\">Phòng đấu giá chưa bắt đầu.</span>");
     return;
   }
   // 1. Lấy giá hiện tại từ giao diện (bóc tách từ chuỗi hiển thị hoặc lưu biến
@@ -86,6 +96,11 @@ void MainWindow::on_btnQuickBid_clicked() {
     QMessageBox::warning(
         this, "Không hợp lệ",
         "Chủ phòng không được phép đấu giá trong phòng của mình.");
+    return;
+  }
+  if (!m_roomStartReached) {
+    ui->txtRoomLog->append(
+        "<span style=\"color:#e67e22;\">Phòng đấu giá chưa bắt đầu.</span>");
     return;
   }
   int currentPrice = m_currentPriceValue;
@@ -159,6 +174,8 @@ void MainWindow::on_btnLeave_clicked() {
   // 2. Xử lý giao diện (UI)
   ui->stackedWidget->setCurrentIndex(1); // Quay về trang Lobby
 
+  resetRoomStartState();
+
   // Xóa log chat cũ để lần sau vào phòng khác không bị lẫn lộn
   ui->txtRoomLog->clear();
   ui->txtChatLog->clear();
@@ -191,6 +208,7 @@ void MainWindow::on_btnLogout_clicked() {
   m_currentPriceValue = 0;
   m_buyNowPriceValue = 0;
   m_isCurrentRoomHost = false;
+  resetRoomStartState();
   m_activeProductId = -1;
   m_activeProductDescription.clear();
   m_ownedRoomIds.clear();
@@ -265,6 +283,7 @@ void MainWindow::on_btnJoin_clicked() {
   // 4. Gửi lệnh Join
   if (m_socket->state() == QAbstractSocket::ConnectedState) {
     m_currentRoomId = roomId;
+    resetRoomStartState();
 
     // Reset UI room trước khi join để tránh xoá mất broadcast (CHAT/COUNT) đến sớm
     ui->txtRoomLog->clear();
@@ -288,6 +307,11 @@ void MainWindow::on_btnBuyNow_clicked() {
     QMessageBox::warning(
         this, "Không hợp lệ",
         "Chủ phòng không được phép mua sản phẩm trong phòng của mình.");
+    return;
+  }
+  if (!m_roomStartReached) {
+    ui->txtRoomLog->append(
+        "<span style=\"color:#e67e22;\">Phòng đấu giá chưa bắt đầu.</span>");
     return;
   }
   // Hiển thị hộp thoại xác nhận cho chắc ăn
@@ -318,6 +342,10 @@ void MainWindow::on_btnSendChat_clicked() {
   QString cmd = QString("CHAT|%1|%2\n").arg(m_currentRoomId).arg(chatText);
   m_socket->write(cmd.toUtf8());
   ui->txtChatInput->clear();
+}
+
+void MainWindow::onRoomStartTimeout() {
+  updateRoomStartState();
 }
 
 void MainWindow::on_btnShowDescription_clicked() {
@@ -542,11 +570,28 @@ void MainWindow::onReadyRead() {
 	        ui->lblBuyNowPrice->setText(formatPrice(buyNow));
 	        // -----------------------------
 
-	        updateRoomInfoUI(host, leader, bidCount, participants);
+        updateRoomInfoUI(host, leader, bidCount, participants);
 
+        QString startTime = (parts.size() >= 11) ? parts[10] : QString();
+        bool startedFlag = parts.size() >= 12 ? parts[11].toInt() != 0 : true;
+        m_roomHasStartTime = false;
+        m_roomStartReached = true;
+        m_roomStartTime = QDateTime();
+        if (!startTime.isEmpty()) {
+          QDateTime parsed =
+              QDateTime::fromString(startTime, "yyyy-MM-dd HH:mm:ss");
+          if (parsed.isValid()) {
+            m_roomHasStartTime = true;
+            m_roomStartTime = parsed;
+            m_roomStartReached = startedFlag;
+          }
+        }
+        if (m_roomStartTimer)
+          m_roomStartTimer->stop();
         // Quyết định quyền host dựa vào hostName do server trả về,
         // tránh mất dấu khi danh sách owned bị reset (logout/restart).
         m_isCurrentRoomHost = (host == m_username);
+        updateRoomStartState(true);
         updateRoomActionPermissions();
 
         // Load full product list for this room
@@ -673,14 +718,33 @@ void MainWindow::onReadyRead() {
 	          refreshProductTableStyles();
 	        }
 	      }
-	    } else if (line.startsWith("ROOM_MEMBER_COUNT")) {
-	      // Server: ROOM_MEMBER_COUNT|RoomID|Count
-	      QStringList parts = line.split('|');
-	      if (parts.size() >= 3) {
-	        int roomId = parts[1].toInt();
+    } else if (line.startsWith("ROOM_MEMBER_COUNT")) {
+      // Server: ROOM_MEMBER_COUNT|RoomID|Count
+      QStringList parts = line.split('|');
+      if (parts.size() >= 3) {
+        int roomId = parts[1].toInt();
         int count = parts[2].toInt();
         if (roomId == m_currentRoomId) {
           ui->lblParticipants->setText(QString::number(count));
+        }
+      }
+    } else if (line.startsWith("ROOM_STATUS")) {
+      // Server: ROOM_STATUS|RoomID|STARTED|StartTime
+      QStringList parts = line.split('|');
+      if (parts.size() >= 3) {
+        int roomId = parts[1].toInt();
+        QString status = parts[2];
+        if (roomId == m_currentRoomId && status == "STARTED") {
+          if (parts.size() >= 4) {
+            QDateTime dt =
+                QDateTime::fromString(parts[3], "yyyy-MM-dd HH:mm:ss");
+            if (dt.isValid()) {
+              m_roomHasStartTime = true;
+              m_roomStartTime = dt;
+            }
+          }
+          m_roomStartReached = true;
+          updateRoomStartState(true);
         }
       }
     } else if (line.startsWith("CHAT")) {
@@ -764,6 +828,9 @@ void MainWindow::onReadyRead() {
       // (Tùy chọn) Reset lại ô nhập liệu cho sạch
       ui->txtBidAmount->clear();
       ui->txtBidAmount->setFocus();
+    } else if (line.startsWith("ERR|ROOM_NOT_STARTED")) {
+      ui->txtRoomLog->append(
+          "<span style=\"color:#e74c3c;\">Phòng đấu giá chưa bắt đầu.</span>");
     } else if (line.startsWith("ERR|LOGIN_FAILED")) {
       QMessageBox::critical(this, "Đăng nhập thất bại",
                             "Tài khoản hoặc mật khẩu không chính xác!\n"
@@ -932,8 +999,46 @@ void MainWindow::on_cboSort_currentIndexChanged(int index) {
   }
 }
 
+void MainWindow::resetRoomStartState() {
+  if (m_roomStartTimer)
+    m_roomStartTimer->stop();
+  m_roomStartTime = QDateTime();
+  m_roomHasStartTime = false;
+  m_roomStartReached = true;
+}
+
+void MainWindow::updateRoomStartState(bool force) {
+  if (!m_roomHasStartTime) {
+    if (force || !m_roomStartReached) {
+      m_roomStartReached = true;
+      updateRoomActionPermissions();
+    }
+    return;
+  }
+
+  QDateTime now = QDateTime::currentDateTime();
+  bool reached = now >= m_roomStartTime;
+  if (force || reached != m_roomStartReached) {
+    m_roomStartReached = reached;
+    updateRoomActionPermissions();
+    if (reached) {
+      ui->txtRoomLog->append(
+          "<span style=\"color:#2ecc71;\">Phiên đấu giá đã bắt đầu.</span>");
+      if (m_roomStartTimer && m_roomStartTimer->isActive())
+        m_roomStartTimer->stop();
+    } else {
+      ui->txtRoomLog->append("<span style=\"color:#e67e22;\">Phòng chưa bắt "
+                             "đầu (lúc " +
+                             m_roomStartTime.toString("yyyy-MM-dd HH:mm:ss") +
+                             ").</span>");
+      if (m_roomStartTimer && !m_roomStartTimer->isActive())
+        m_roomStartTimer->start();
+    }
+  }
+}
+
 void MainWindow::updateRoomActionPermissions() {
-  bool canAct = !m_isCurrentRoomHost;
+  bool canAct = !m_isCurrentRoomHost && m_roomStartReached;
   ui->btnBid->setEnabled(canAct);
   ui->btnBuyNow->setEnabled(canAct);
   ui->btnQuickBid->setEnabled(canAct);

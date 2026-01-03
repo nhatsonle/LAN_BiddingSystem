@@ -3,7 +3,9 @@
 
 #include <QMainWindow>
 #include <QSet>
-#include <QTcpSocket> // Thư viện Socket của Qt
+#include <QTcpSocket> // Qt Socket
+#include <QDateTime>
+#include <QTimer>
 
 QT_BEGIN_NAMESPACE
 namespace Ui {
@@ -42,6 +44,7 @@ private slots:
   void on_btnQuickBid_clicked();
   void on_btnShowDescription_clicked();
   void on_tblRoomProducts_cellClicked(int row, int column);
+  void onRoomStartTimeout();
 
   void on_cboSort_currentIndexChanged(int index);
   void on_btnSendChat_clicked();
@@ -58,6 +61,14 @@ private:
   bool m_isCurrentRoomHost = false;
   int m_activeProductId = -1;
   QString m_activeProductDescription;
+
+  QTimer *m_roomStartTimer;
+  QDateTime m_roomStartTime;
+  bool m_roomHasStartTime = false;
+  bool m_roomStartReached = true;
+
+  void resetRoomStartState();
+  void updateRoomStartState(bool force = false);
 
   void updateRoomActionPermissions();
   QString formatPrice(int value) const;

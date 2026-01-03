@@ -2,17 +2,54 @@
 #include "DatabaseManager.h"
 #include <algorithm>
 #include <chrono>
+#include <ctime>
+#include <iomanip>
 #include <iostream>
+#include <sstream>
 #include <thread>
 
+static bool parseStartTime(const std::string &input,
+                           std::chrono::system_clock::time_point &out) {
+  if (input.empty())
+    return false;
+  std::tm tm = {};
+  std::istringstream ss(input);
+  ss >> std::get_time(&tm, "%Y-%m-%d %H:%M:%S");
+  if (ss.fail())
+    return false;
+  tm.tm_isdst = -1;
+  std::time_t timeVal = std::mktime(&tm);
+  if (timeVal == -1)
+    return false;
+  out = std::chrono::system_clock::from_time_t(timeVal);
+  return true;
+}
+
 int RoomManager::createRoom(std::string roomName, std::vector<Product> products,
-                            SocketType ownerSocket, int ownerUserId) {
+                            SocketType ownerSocket, int ownerUserId,
+                            const std::string &startTime) {
   std::lock_guard<std::recursive_mutex> lock(roomsMutex);
 
   if (products.empty())
     return -1;
 
   Room newRoom;
+  newRoom.hasStartTime = false;
+  newRoom.startTimeString.clear();
+  newRoom.isWaitingForStart = false;
+  if (!startTime.empty()) {
+    std::chrono::system_clock::time_point tp;
+    if (parseStartTime(startTime, tp)) {
+      newRoom.hasStartTime = true;
+      newRoom.startTime = tp;
+      newRoom.startTimeString = startTime;
+      if (!newRoom.hasStarted()) {
+        newRoom.isWaitingForStart = true;
+      }
+    } else {
+      newRoom.startTimeString = startTime;
+    }
+  }
   // newRoom.id = roomIdCounter++;
   // THAY ĐỔI: Gọi DB để lấy ID phòng (Persistent)
   int dbRoomId =
@@ -235,11 +272,14 @@ bool RoomManager::joinRoom(int roomId, SocketType clientSocket,
       std::string participantNames;
       int participantCount = static_cast<int>(r.participants.size());
 
+      std::string startField = r.startTimeString;
+      std::string startedFlag = r.hasStarted() ? "1" : "0";
       outRoomInfo = std::to_string(r.id) + "|" + r.itemName + "|" +
                     std::to_string(r.currentPrice) + "|" +
                     std::to_string(r.buyNowPrice) + "|" + r.hostName + "|" +
                     r.highestBidderName + "|" + std::to_string(r.bidCount) +
-                    "|" + std::to_string(participantCount);
+                    "|" + std::to_string(participantCount) + "|" + startField +
+                    "|" + startedFlag;
       // -------------------------
 
       return true;
@@ -259,8 +299,10 @@ bool RoomManager::isUserLoggedIn(const std::string &username) {
 }
 
 bool RoomManager::placeBid(int roomId, int amount, SocketType bidderSocket,
-                           std::string &outBroadcastMsg) {
+                           std::string &outBroadcastMsg,
+                           std::string &outError) {
   std::lock_guard<std::recursive_mutex> lock(roomsMutex);
+  outError.clear();
   for (auto &r : rooms) {
     if (r.id == roomId) {
       // Kiểm tra: Nếu phòng đã đóng thì không cho bid
@@ -269,6 +311,10 @@ bool RoomManager::placeBid(int roomId, int amount, SocketType bidderSocket,
       int bidderUserId = getUserId(bidderSocket);
       if (bidderUserId == r.hostUserId)
         return false; // chủ phòng không được bid
+      if (!r.hasStarted()) {
+        outError = "ERR|ROOM_NOT_STARTED";
+        return false;
+      }
       // Nếu giá bid chạm/qua giá mua ngay -> xử lý mua ngay
       if (amount >= r.buyNowPrice) {
         std::string bidderName = getUsername(bidderSocket);
@@ -338,7 +384,18 @@ bool RoomManager::placeBid(int roomId, int amount, SocketType bidderSocket,
                           bidderName + "|" + std::to_string(r.bidCount) + "\n";
         return true;
       }
+      outError = "ERR|PRICE_TOO_LOW";
       return false;
+    }
+  }
+  return false;
+}
+
+bool RoomManager::isRoomStarted(int roomId) {
+  std::lock_guard<std::recursive_mutex> lock(roomsMutex);
+  for (const auto &r : rooms) {
+    if (r.id == roomId) {
+      return r.hasStarted();
     }
   }
   return false;
@@ -444,6 +501,17 @@ void RoomManager::updateTimers(BroadcastCallback callback) {
       continue;
     if (r.participants.empty())
       continue;
+    if (r.isWaitingForStart) {
+      if (!r.hasStarted())
+        continue;
+      r.isWaitingForStart = false;
+      std::string startMsg =
+          "ROOM_STATUS|" + std::to_string(r.id) + "|STARTED";
+      if (!r.startTimeString.empty())
+        startMsg += "|" + r.startTimeString;
+      startMsg += "\n";
+      callback(r.id, startMsg);
+    }
 
     r.timeLeft--;
 

@@ -162,6 +162,7 @@ std::string AuctionServer::processCommand(SocketType clientSocket,
 
     std::string roomName = tokens[1];
     std::string allProductsStr = tokens[2]; // Chuỗi dài chứa tất cả SP
+    std::string startTime = tokens.size() >= 4 ? tokens[3] : "";
 
     std::vector<Product> productList;
 
@@ -204,13 +205,16 @@ std::string AuctionServer::processCommand(SocketType clientSocket,
 
     // Gọi Manager tạo phòng, gắn quyền chủ phòng
     int newId = RoomManager::getInstance().createRoom(
-        roomName, productList, clientSocket, ownerUserId);
+        roomName, productList, clientSocket, ownerUserId, startTime);
     return "OK|ROOM_CREATED|" + std::to_string(newId);
   } else if (cmd == "BUY_NOW") {
     if (tokens.size() < 2)
       return "ERR|MISSING_ARGS";
     int rId = std::stoi(tokens[1]);
     std::string broadcastMsg;
+
+    if (!RoomManager::getInstance().isRoomStarted(rId))
+      return "ERR|ROOM_NOT_STARTED";
 
     // 1. Tạo một lambda function để làm callback broadcast
     auto broadcastFunc = [this](int roomId, std::string msg) {
@@ -257,13 +261,14 @@ std::string AuctionServer::processCommand(SocketType clientSocket,
     std::string broadcastMsg;
 
     // Gọi hàm placeBid của Manager
+    std::string errorMsg;
     if (RoomManager::getInstance().placeBid(rId, amount, clientSocket,
-                                            broadcastMsg)) {
+                                            broadcastMsg, errorMsg)) {
       // Nếu thành công thì Broadcast ngay tại đây
       broadcastToRoom(rId, broadcastMsg);
       return "OK|BID_SUCCESS|" + std::to_string(amount);
     } else {
-      return "ERR|PRICE_TOO_LOW";
+      return errorMsg.empty() ? "ERR|PRICE_TOO_LOW" : errorMsg;
     }
   } else if (cmd == "CHAT") { // CHAT|ID|Message
     if (tokens.size() < 3)

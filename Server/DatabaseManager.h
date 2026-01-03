@@ -37,7 +37,8 @@ public:
 
   // --- Room & Product Management ---
   // --- Room & Product Management ---
-  int createRoom(const std::string &name, int createdByUserId = -1);
+  int createRoom(const std::string &name, int createdByUserId = -1,
+                 const std::string &startTime = "");
   int saveProduct(int roomId, const std::string &name, int startPrice,
                   int buyNowPrice, int duration, const std::string &description);
   void updateRoomStatus(int roomId, const std::string &status);

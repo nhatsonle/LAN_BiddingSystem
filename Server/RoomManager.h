@@ -47,13 +47,15 @@ public:
 
   // Các hàm nghiệp vụ
   int createRoom(std::string roomName, std::vector<Product> products,
-                 SocketType ownerSocket, int ownerUserId);
+                 SocketType ownerSocket, int ownerUserId,
+                 const std::string &startTime);
   bool joinRoom(int roomId, SocketType clientSocket, std::string &outRoomInfo);
   bool buyNow(int roomId, SocketType buyerSocket, std::string &outMsg,
               BroadcastCallback callback); // Hàm xử lý Bid: Trả về true nếu
                                            // thành công, cập nhật broadcastMsg
   bool placeBid(int roomId, int amount, SocketType bidderSocket,
-                std::string &outBroadcastMsg);
+                std::string &outBroadcastMsg, std::string &outError);
+  bool isRoomStarted(int roomId);
   bool leaveRoom(int roomId, SocketType clientSocket);
   // Lấy danh sách socket trong phòng để gửi tin
   std::vector<SocketType> getParticipants(int roomId);
