@@ -40,6 +40,8 @@ private slots:
   void on_txtSearch_textChanged(const QString &arg1);
   void on_btnOpenRegister_clicked();
   void on_btnQuickBid_clicked();
+  void on_btnShowDescription_clicked();
+  void on_tblRoomProducts_cellClicked(int row, int column);
 
   void on_cboSort_currentIndexChanged(int index);
   void on_btnSendChat_clicked();
@@ -54,6 +56,8 @@ private:
   int m_buyNowPriceValue = 0;
   QSet<int> m_ownedRoomIds;
   bool m_isCurrentRoomHost = false;
+  int m_activeProductId = -1;
+  QString m_activeProductDescription;
 
   void updateRoomActionPermissions();
   QString formatPrice(int value) const;

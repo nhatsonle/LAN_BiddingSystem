@@ -10,6 +10,7 @@ typedef int SocketType;
 struct Product {
   int id; // <-- ID tu Database
   std::string name;
+  std::string description;
   int startPrice;
   int buyNowPrice;
   int duration;

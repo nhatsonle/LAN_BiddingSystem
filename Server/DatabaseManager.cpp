@@ -2,6 +2,27 @@
 #include <algorithm>
 #include <sstream>
 
+static std::string escapeSqlString(const std::string &input) {
+  std::string out;
+  out.reserve(input.size());
+  for (char c : input) {
+    out.push_back(c);
+    if (c == '\'')
+      out.push_back('\'');
+  }
+  return out;
+}
+
+static std::string sanitizeProtocolField(const std::string &input) {
+  std::string out = input;
+  for (char &c : out) {
+    if (c == ',' || c == ';' || c == '|' || c == '\n' || c == '\r') {
+      c = ' ';
+    }
+  }
+  return out;
+}
+
 // Callback dùng để lấy userId khi login
 static int loginCallback(void *data, int argc, char **argv, char **azColName) {
   int *userId = (int *)data;
@@ -77,6 +98,7 @@ bool DatabaseManager::init(const std::string &dbName) {
                             "id INTEGER PRIMARY KEY AUTOINCREMENT,"
                             "room_id INTEGER NOT NULL,"
                             "name TEXT NOT NULL,"
+                            "description TEXT DEFAULT '',"
                             "start_price INTEGER NOT NULL,"
                             "buy_now_price INTEGER,"
                             "duration INTEGER NOT NULL,"
@@ -315,11 +337,12 @@ std::string DatabaseManager::getWonItems(const std::string &username) {
 
 int DatabaseManager::createRoom(const std::string &name, int createdByUserId) {
   std::string sql;
+  std::string safeName = escapeSqlString(name);
   if (createdByUserId > 0) {
-    sql = "INSERT INTO rooms (name, created_by) VALUES ('" + name + "', " +
+    sql = "INSERT INTO rooms (name, created_by) VALUES ('" + safeName + "', " +
           std::to_string(createdByUserId) + ");";
   } else {
-    sql = "INSERT INTO rooms (name) VALUES ('" + name + "');";
+    sql = "INSERT INTO rooms (name) VALUES ('" + safeName + "');";
   }
   char *zErrMsg = 0;
   int rc = sqlite3_exec(db, sql.c_str(), 0, 0, &zErrMsg);
@@ -333,15 +356,17 @@ int DatabaseManager::createRoom(const std::string &name, int createdByUserId) {
 }
 
 int DatabaseManager::saveProduct(int roomId, const std::string &name,
-                                 int startPrice, int buyNowPrice,
-                                 int duration) {
+                                 int startPrice, int buyNowPrice, int duration,
+                                 const std::string &description) {
   int cappedDuration = std::min(duration, 1800); // tối đa 30 phút
-  std::string sql = "INSERT INTO products (room_id, name, start_price, "
-                    "buy_now_price, duration) VALUES (" +
-                    std::to_string(roomId) + ", '" + name + "', " +
-                    std::to_string(startPrice) + ", " +
-                    std::to_string(buyNowPrice) + ", " +
-                    std::to_string(cappedDuration) + ");";
+  std::string safeName = escapeSqlString(name);
+  std::string safeDesc = escapeSqlString(description);
+  std::string sql =
+      "INSERT INTO products (room_id, name, description, start_price, "
+      "buy_now_price, duration) VALUES (" +
+      std::to_string(roomId) + ", '" + safeName + "', '" + safeDesc + "', " +
+      std::to_string(startPrice) + ", " + std::to_string(buyNowPrice) + ", " +
+      std::to_string(cappedDuration) + ");";
 
   char *zErrMsg = 0;
   int rc = sqlite3_exec(db, sql.c_str(), 0, 0, &zErrMsg);
@@ -385,10 +410,10 @@ void DatabaseManager::addRoomMember(int roomId, int userId,
 }
 
 std::string DatabaseManager::getProductList(int roomId) {
-  // Format: productId,status,name;productId,status,name;...
+  // Format: productId,status,name,description;productId,status,name,description;...
   std::string list;
   std::string sql =
-      "SELECT id, status, name FROM products WHERE room_id=" +
+      "SELECT id, status, name, description FROM products WHERE room_id=" +
       std::to_string(roomId) + " ORDER BY id ASC;";
 
   auto cb = [](void *data, int argc, char **argv, char **col) -> int {
@@ -396,7 +421,10 @@ std::string DatabaseManager::getProductList(int roomId) {
     std::string id = (argc > 0 && argv[0]) ? argv[0] : "0";
     std::string status = (argc > 1 && argv[1]) ? argv[1] : "WAITING";
     std::string name = (argc > 2 && argv[2]) ? argv[2] : "";
-    *res += id + "," + status + "," + name + ";";
+    std::string desc = (argc > 3 && argv[3]) ? argv[3] : "";
+    name = sanitizeProtocolField(name);
+    desc = sanitizeProtocolField(desc);
+    *res += id + "," + status + "," + name + "," + desc + ";";
     return 0;
   };
 
@@ -418,6 +446,7 @@ struct ProdData {
   int id;
   int roomId;
   std::string name;
+  std::string description;
   int start;
   int buyNow;
   int duration;
@@ -471,15 +500,16 @@ std::vector<Room> DatabaseManager::loadOpenRooms() {
       ProdData p;
       p.id = std::stoi(argv[0]);
       p.name = (argv[1] ? argv[1] : "");
-      p.start = std::stoi(argv[2]);
-      p.buyNow = std::stoi(argv[3]);
-      p.duration = std::stoi(argv[4]);
-      p.status = (argv[5] ? argv[5] : "WAITING");
+      p.description = (argv[2] ? argv[2] : "");
+      p.start = std::stoi(argv[3]);
+      p.buyNow = std::stoi(argv[4]);
+      p.duration = std::stoi(argv[5]);
+      p.status = (argv[6] ? argv[6] : "WAITING");
       list->push_back(p);
       return 0;
     };
     std::string sqlP =
-        "SELECT id, name, start_price, buy_now_price, duration, status FROM "
+        "SELECT id, name, description, start_price, buy_now_price, duration, status FROM "
         "products WHERE room_id=" +
         std::to_string(rd.id) +
         " AND status IN ('WAITING','ACTIVE') ORDER BY id ASC;";
@@ -521,6 +551,7 @@ std::vector<Room> DatabaseManager::loadOpenRooms() {
       Product p;
       p.id = pList[i].id;
       p.name = pList[i].name;
+      p.description = pList[i].description;
       p.startPrice = pList[i].start;
       p.buyNowPrice = pList[i].buyNow;
       p.duration = pList[i].duration;

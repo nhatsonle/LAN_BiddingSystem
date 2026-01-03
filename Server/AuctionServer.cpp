@@ -24,6 +24,32 @@ static bool sendAll(SocketType sock, const char *data, size_t len) {
   return true;
 }
 
+static std::string sanitizeDescription(const std::string &input) {
+  std::string cleaned;
+  cleaned.reserve(input.size());
+  for (char c : input) {
+    if (c == ',' || c == ';' || c == '|' || c == '\n' || c == '\r') {
+      cleaned.push_back(' ');
+    } else {
+      cleaned.push_back(c);
+    }
+  }
+
+  std::istringstream iss(cleaned);
+  std::string word;
+  std::string out;
+  int count = 0;
+  while (iss >> word) {
+    if (count >= 50)
+      break;
+    if (count > 0)
+      out.push_back(' ');
+    out += word;
+    ++count;
+  }
+  return out;
+}
+
 AuctionServer::AuctionServer(int port) : port(port) {}
 
 AuctionServer::~AuctionServer() {}
@@ -130,7 +156,7 @@ std::string AuctionServer::processCommand(SocketType clientSocket,
       return "ERR|USER_EXISTS"; // Báo lỗi trùng tên
     }
   } else if (cmd == "CREATE_ROOM") {
-    // Format: CREATE_ROOM|RoomName|Item1,10,20,30;Item2,5,10,20
+    // Format: CREATE_ROOM|RoomName|Name,Start,BuyNow,Duration[,Description];...
     if (tokens.size() < 3)
       return "ERR|MISSING_ARGS";
 
@@ -142,19 +168,21 @@ std::string AuctionServer::processCommand(SocketType clientSocket,
     // 1. Tách các sản phẩm bằng dấu chấm phẩy ';'
     std::vector<std::string> items = split(allProductsStr, ';');
 
-    for (const std::string &itemStr : items) {
-      // 2. Tách chi tiết từng sản phẩm bằng dấu phẩy ','
-      // Format: Name,Start,BuyNow,Duration
-      std::vector<std::string> details = split(itemStr, ',');
+	    for (const std::string &itemStr : items) {
+	      // 2. Tách chi tiết từng sản phẩm bằng dấu phẩy ','
+	      // Format: Name,Start,BuyNow,Duration[,Description]
+	      std::vector<std::string> details = split(itemStr, ',');
 
-      if (details.size() >= 4) {
-        Product p;
-        p.name = details[0];
-        try {
-          p.startPrice = std::stoi(details[1]);
-          p.buyNowPrice = std::stoi(details[2]);
-          p.duration = std::stoi(details[3]);
-          p.duration = std::min(p.duration, 1800); // giới hạn 30 phút
+	      if (details.size() >= 4) {
+	        Product p;
+	        p.name = details[0];
+	        p.description =
+	            (details.size() >= 5) ? sanitizeDescription(details[4]) : "";
+	        try {
+	          p.startPrice = std::stoi(details[1]);
+	          p.buyNowPrice = std::stoi(details[2]);
+	          p.duration = std::stoi(details[3]);
+	          p.duration = std::min(p.duration, 1800); // giới hạn 30 phút
 
           // Logic validate cơ bản
           if (p.buyNowPrice > p.startPrice) {

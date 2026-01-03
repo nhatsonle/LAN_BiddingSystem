@@ -266,14 +266,27 @@ QPushButton:hover { background-color: #219150; }</string>
           <height>18</height>
          </rect>
         </property>
-        <property name="text">
-         <string>Đang đấu giá:</string>
-        </property>
-       </widget>
-       <widget class="QLCDNumber" name="lcdTimer">
-        <property name="geometry">
-         <rect>
-          <x>260</x>
+       <property name="text">
+        <string>Đang đấu giá:</string>
+       </property>
+      </widget>
+      <widget class="QPushButton" name="btnShowDescription">
+       <property name="geometry">
+        <rect>
+         <x>80</x>
+         <y>45</y>
+         <width>150</width>
+         <height>26</height>
+        </rect>
+       </property>
+       <property name="text">
+        <string>Xem mô tả</string>
+       </property>
+      </widget>
+      <widget class="QLCDNumber" name="lcdTimer">
+       <property name="geometry">
+        <rect>
+         <x>260</x>
           <y>20</y>
           <width>220</width>
           <height>60</height>

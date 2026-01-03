@@ -8,6 +8,7 @@
 // Định nghĩa struct ProductInfo ngay tại đây để Class bên dưới hiểu được
 struct ProductInfo {
     QString name;
+    QString description;
     int startPrice;
     int buyNowPrice;
     int duration;

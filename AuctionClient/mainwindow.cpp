@@ -169,6 +169,8 @@ void MainWindow::on_btnLeave_clicked() {
   m_currentPriceValue = 0;
   m_buyNowPriceValue = 0;
   m_isCurrentRoomHost = false;
+  m_activeProductId = -1;
+  m_activeProductDescription.clear();
   updateRoomActionPermissions();
 
   // (Tùy chọn) Refresh lại danh sách phòng ngoài sảnh để cập nhật giá mới nhất
@@ -189,6 +191,8 @@ void MainWindow::on_btnLogout_clicked() {
   m_currentPriceValue = 0;
   m_buyNowPriceValue = 0;
   m_isCurrentRoomHost = false;
+  m_activeProductId = -1;
+  m_activeProductDescription.clear();
   m_ownedRoomIds.clear();
 
   // 3. Reset giao diện
@@ -214,14 +218,15 @@ void MainWindow::on_btnCreateRoom_clicked() {
     QString startTime = dlg.getStartTimeString();
 
     // Xây dựng chuỗi danh sách sản phẩm
-    // Ví dụ: "iPhone,1000,2000,60;TaiNghe,500,1000,30"
+    // Ví dụ: "iPhone,1000,2000,60,Mo ta;TaiNghe,500,1000,30,Mo ta"
     QStringList productStrings;
     for (const auto &p : products) {
-      QString itemStr = QString("%1,%2,%3,%4")
+      QString itemStr = QString("%1,%2,%3,%4,%5")
                             .arg(p.name)
                             .arg(p.startPrice)
                             .arg(p.buyNowPrice)
-                            .arg(p.duration);
+                            .arg(p.duration)
+                            .arg(p.description);
       productStrings << itemStr;
     }
 
@@ -313,6 +318,45 @@ void MainWindow::on_btnSendChat_clicked() {
   QString cmd = QString("CHAT|%1|%2\n").arg(m_currentRoomId).arg(chatText);
   m_socket->write(cmd.toUtf8());
   ui->txtChatInput->clear();
+}
+
+void MainWindow::on_btnShowDescription_clicked() {
+  if (m_currentRoomId < 0) {
+    return;
+  }
+
+  if (m_activeProductId < 0) {
+    QMessageBox::information(this, "Mô tả sản phẩm",
+                             "Chưa có sản phẩm đang đấu giá.");
+    return;
+  }
+
+  QString desc = m_activeProductDescription.trimmed();
+  if (desc.isEmpty()) {
+    desc = "Chưa có mô tả.";
+  }
+
+  QString title = ui->lblRoomName->text().trimmed();
+  if (title.isEmpty()) {
+    title = "Mô tả sản phẩm";
+  }
+  QMessageBox::information(this, title, desc);
+}
+
+void MainWindow::on_tblRoomProducts_cellClicked(int row, int column) {
+  (void)column;
+  QTableWidgetItem *nameItem = ui->tblRoomProducts->item(row, 0);
+  if (!nameItem) {
+    return;
+  }
+
+  QString name = nameItem->text().trimmed();
+  QString desc = nameItem->data(Qt::UserRole + 2).toString().trimmed();
+  if (desc.isEmpty()) {
+    desc = "Chưa có mô tả.";
+  }
+
+  QMessageBox::information(this, "Mô tả - " + name, desc);
 }
 
 void MainWindow::on_btnOpenRegister_clicked() {
@@ -524,12 +568,13 @@ void MainWindow::onReadyRead() {
 	      QStringList entries = data.split(';', Qt::SkipEmptyParts);
 	      for (const QString &entry : entries) {
 	        QStringList fields = entry.split(',');
-	        if (fields.size() < 3)
+	        if (fields.size() < 4)
 	          continue;
 
 	        int productId = fields[0].toInt();
 	        QString status = fields[1].trimmed();
 	        QString name = fields[2];
+	        QString description = fields[3];
 
 	        int row = ui->tblRoomProducts->rowCount();
 	        ui->tblRoomProducts->insertRow(row);
@@ -537,6 +582,7 @@ void MainWindow::onReadyRead() {
 	        auto *nameItem = new QTableWidgetItem(name);
 	        nameItem->setData(Qt::UserRole, productId);
 	        nameItem->setData(Qt::UserRole + 1, status);
+	        nameItem->setData(Qt::UserRole + 2, description);
 
 	        auto *statusItem = new QTableWidgetItem(statusToText(status));
 	        statusItem->setData(Qt::UserRole, productId);
@@ -546,6 +592,22 @@ void MainWindow::onReadyRead() {
 	        ui->tblRoomProducts->setItem(row, 1, statusItem);
 	      }
 	      refreshProductTableStyles();
+
+	      // Cache active product description for the top button
+	      m_activeProductId = -1;
+	      m_activeProductDescription.clear();
+	      for (int row = 0; row < ui->tblRoomProducts->rowCount(); ++row) {
+	        QTableWidgetItem *nameItem = ui->tblRoomProducts->item(row, 0);
+	        if (!nameItem)
+	          continue;
+	        QString status = nameItem->data(Qt::UserRole + 1).toString();
+	        if (status == "ACTIVE") {
+	          m_activeProductId = nameItem->data(Qt::UserRole).toInt();
+	          m_activeProductDescription =
+	              nameItem->data(Qt::UserRole + 2).toString();
+	          break;
+	        }
+	      }
 	    }
 
 	    // 2. XỬ LÝ KHI CÓ NGƯỜI RA GIÁ (BROADCAST)
@@ -600,6 +662,11 @@ void MainWindow::onReadyRead() {
 	              nameItem->setData(Qt::UserRole + 1, status);
 	              statusItem->setData(Qt::UserRole + 1, status);
 	              statusItem->setText(statusToText(status));
+	              if (status == "ACTIVE") {
+	                m_activeProductId = productId;
+	                m_activeProductDescription =
+	                    nameItem->data(Qt::UserRole + 2).toString();
+	              }
 	              break;
 	            }
 	          }

@@ -29,7 +29,8 @@ int RoomManager::createRoom(std::string roomName, std::vector<Product> products,
   for (size_t i = 0; i < productsWithId.size(); ++i) {
     int pid = DatabaseManager::getInstance().saveProduct(
         newRoom.id, productsWithId[i].name, productsWithId[i].startPrice,
-        productsWithId[i].buyNowPrice, productsWithId[i].duration);
+        productsWithId[i].buyNowPrice, productsWithId[i].duration,
+        productsWithId[i].description);
     productsWithId[i].id = pid;
     // Đảm bảo duration không vượt quá 30 phút (phù hợp DB)
     productsWithId[i].duration = std::min(productsWithId[i].duration, 1800);
