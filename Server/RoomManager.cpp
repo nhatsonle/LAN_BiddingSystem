@@ -342,8 +342,19 @@ std::vector<SocketType> RoomManager::getParticipants(int roomId) {
   return {};
 }
 
-void RoomManager::removeClient(SocketType clientSocket) {
+int RoomManager::getParticipantCount(int roomId) {
   std::lock_guard<std::recursive_mutex> lock(roomsMutex);
+  for (const auto &r : rooms) {
+    if (r.id == roomId) {
+      return static_cast<int>(r.participants.size());
+    }
+  }
+  return 0;
+}
+
+std::vector<std::pair<int, int>> RoomManager::removeClient(SocketType clientSocket) {
+  std::lock_guard<std::recursive_mutex> lock(roomsMutex);
+  std::vector<std::pair<int, int>> affectedRooms;
 
   // Xóa khỏi userMap
   if (userMap.count(clientSocket)) {
@@ -359,10 +370,13 @@ void RoomManager::removeClient(SocketType clientSocket) {
 
     if (it != room.participants.end()) {
       room.participants.erase(it, room.participants.end());
+      affectedRooms.push_back({room.id, static_cast<int>(room.participants.size())});
       std::cout << "[INFO] Removed client " << clientSocket << " from Room "
                 << room.id << std::endl;
     }
   }
+
+  return affectedRooms;
 }
 
 void RoomManager::loginUser(SocketType sock, int userId, std::string name) {

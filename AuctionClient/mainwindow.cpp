@@ -487,6 +487,16 @@ void MainWindow::onReadyRead() {
       } else {
         qDebug() << "ERROR: Split size wrong! Check protocol separator.";
       }
+    } else if (line.startsWith("ROOM_MEMBER_COUNT")) {
+      // Server: ROOM_MEMBER_COUNT|RoomID|Count
+      QStringList parts = line.split('|');
+      if (parts.size() >= 3) {
+        int roomId = parts[1].toInt();
+        int count = parts[2].toInt();
+        if (roomId == m_currentRoomId) {
+          ui->lblParticipants->setText(QString::number(count));
+        }
+      }
     } else if (line.startsWith("CHAT")) {
       // Server: CHAT|<username>|<message>
       QStringList parts = line.split('|');
@@ -636,7 +646,6 @@ void MainWindow::onReadyRead() {
         ui->lblLeader->setText("-");
         ui->lblBidCount->setText("0");
         ui->lblNextInfo->setText("-");
-        ui->lblParticipants->setText("-");
 
         // 3. Reset các nút (nếu bị disable do sold trước đó)
         ui->btnBid->setEnabled(true);

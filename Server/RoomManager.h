@@ -8,6 +8,7 @@
 #include <mutex>
 #include <queue>
 #include <string>
+#include <utility>
 #include <vector>
 
 // --- 1. ĐỊNH NGHĨA CALLBACK & SOCKET ---
@@ -56,10 +57,11 @@ public:
   bool leaveRoom(int roomId, SocketType clientSocket);
   // Lấy danh sách socket trong phòng để gửi tin
   std::vector<SocketType> getParticipants(int roomId);
+  int getParticipantCount(int roomId);
 
   // Hàm cập nhật thời gian (Được gọi mỗi giây)
   void updateTimers(BroadcastCallback callback);
-  void removeClient(SocketType clientSocket);
+  std::vector<std::pair<int, int>> removeClient(SocketType clientSocket);
 
   // Quản lý User Login
   void loginUser(SocketType sock, int userId, std::string name);

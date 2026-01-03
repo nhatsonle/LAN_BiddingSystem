@@ -185,14 +185,23 @@ std::string AuctionServer::processCommand(SocketType clientSocket,
     std::string list = RoomManager::getInstance().getRoomList();
     return "OK|LIST|" + list;
   } else if (cmd == "JOIN_ROOM") { // JOIN_ROOM|ID
+    if (tokens.size() < 2)
+      return "ERR|MISSING_ARGS";
+
+    int roomId = std::stoi(tokens[1]);
     std::string info;
-    if (RoomManager::getInstance().joinRoom(std::stoi(tokens[1]), clientSocket,
-                                            info)) {
+    if (RoomManager::getInstance().joinRoom(roomId, clientSocket, info)) {
       // Broadcast thông báo vào phòng
       std::string username =
           RoomManager::getInstance().getUsername(clientSocket);
       std::string joinMsg = "CHAT|" + username + "|đã tham gia phòng\n";
-      broadcastToRoom(std::stoi(tokens[1]), joinMsg);
+      broadcastToRoom(roomId, joinMsg);
+
+      std::string countMsg =
+          "ROOM_MEMBER_COUNT|" + std::to_string(roomId) + "|" +
+          std::to_string(RoomManager::getInstance().getParticipantCount(roomId)) +
+          "\n";
+      broadcastToRoom(roomId, countMsg);
       // Trả về thêm 1 dòng chat để chính người tham gia cũng thấy trong log
       return "OK|JOINED|" + info + "\n" + joinMsg;
     }
@@ -228,6 +237,11 @@ std::string AuctionServer::processCommand(SocketType clientSocket,
 
     int rId = std::stoi(tokens[1]);
     if (RoomManager::getInstance().leaveRoom(rId, clientSocket)) {
+      std::string countMsg =
+          "ROOM_MEMBER_COUNT|" + std::to_string(rId) + "|" +
+          std::to_string(RoomManager::getInstance().getParticipantCount(rId)) +
+          "\n";
+      broadcastToRoom(rId, countMsg);
       return "OK|LEFT_ROOM";
     } else {
       return "ERR|ROOM_NOT_FOUND_OR_NOT_IN";
@@ -313,7 +327,14 @@ void AuctionServer::handleClient(SocketType clientSocket) {
   }
 
   // --- CLEANUP WHEN CLIENT DISCONNECTS ---
-  RoomManager::getInstance().removeClient(clientSocket);
+  auto affectedRooms = RoomManager::getInstance().removeClient(clientSocket);
+  for (const auto &entry : affectedRooms) {
+    int roomId = entry.first;
+    int count = entry.second;
+    std::string countMsg = "ROOM_MEMBER_COUNT|" + std::to_string(roomId) + "|" +
+                           std::to_string(count) + "\n";
+    broadcastToRoom(roomId, countMsg);
+  }
   // --------------------------------------
 
   close(clientSocket);
