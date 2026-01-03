@@ -17,7 +17,7 @@
    <item>
     <widget class="QTabWidget" name="tabWidget">
      <property name="currentIndex">
-      <number>0</number>
+      <number>2</number>
      </property>
      <widget class="QWidget" name="tabInfo">
       <attribute name="title">
@@ -81,7 +81,41 @@
       </attribute>
       <layout class="QVBoxLayout" name="verticalLayout_2">
        <item>
-        <widget class="QListWidget" name="listHistory"/>
+        <widget class="QTableWidget" name="tableHistory">
+         <property name="editTriggers">
+          <set>QAbstractItemView::EditTrigger::NoEditTriggers</set>
+         </property>
+         <property name="selectionMode">
+          <enum>QAbstractItemView::SelectionMode::SingleSelection</enum>
+         </property>
+         <property name="selectionBehavior">
+          <enum>QAbstractItemView::SelectionBehavior::SelectRows</enum>
+         </property>
+         <property name="showGrid">
+          <bool>true</bool>
+         </property>
+         <attribute name="horizontalHeaderVisible">
+          <bool>true</bool>
+         </attribute>
+         <attribute name="horizontalHeaderStretchLastSection">
+          <bool>true</bool>
+         </attribute>
+         <column>
+          <property name="text">
+           <string>Vật phẩm</string>
+          </property>
+         </column>
+         <column>
+          <property name="text">
+           <string>Giá cuối</string>
+          </property>
+         </column>
+         <column>
+          <property name="text">
+           <string>Người thắng</string>
+          </property>
+         </column>
+        </widget>
        </item>
        <item>
         <widget class="QPushButton" name="btnRefreshHistory">
@@ -98,7 +132,41 @@
       </attribute>
       <layout class="QVBoxLayout" name="verticalLayout_3">
        <item>
-        <widget class="QListWidget" name="listWon"/>
+        <widget class="QTableWidget" name="tableWon">
+         <property name="editTriggers">
+          <set>QAbstractItemView::EditTrigger::NoEditTriggers</set>
+         </property>
+         <property name="selectionMode">
+          <enum>QAbstractItemView::SelectionMode::SingleSelection</enum>
+         </property>
+         <property name="selectionBehavior">
+          <enum>QAbstractItemView::SelectionBehavior::SelectRows</enum>
+         </property>
+         <property name="showGrid">
+          <bool>true</bool>
+         </property>
+         <attribute name="horizontalHeaderVisible">
+          <bool>true</bool>
+         </attribute>
+         <attribute name="horizontalHeaderStretchLastSection">
+          <bool>true</bool>
+         </attribute>
+         <column>
+          <property name="text">
+           <string>Sản phẩm</string>
+          </property>
+         </column>
+         <column>
+          <property name="text">
+           <string>Giá</string>
+          </property>
+         </column>
+         <column>
+          <property name="text">
+           <string>Thời gian</string>
+          </property>
+         </column>
+        </widget>
        </item>
        <item>
         <widget class="QPushButton" name="btnRefreshWon">
