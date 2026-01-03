@@ -3,14 +3,28 @@
 #include "profiledialog.h" // <-- Added here
 #include "registerdialog.h"
 #include "ui_mainwindow.h"
+#include <QColor>
 #include <QDebug>
+#include <QHeaderView>
 #include <QMessageBox>
+#include <QTableWidgetItem>
 #include <QTimer>
 #include <algorithm>
 
 MainWindow::MainWindow(QWidget *parent)
     : QMainWindow(parent), ui(new Ui::MainWindow) {
   ui->setupUi(this);
+
+  // --- Product list table (Room) ---
+  ui->tblRoomProducts->setColumnCount(2);
+  ui->tblRoomProducts->setHorizontalHeaderLabels(
+      QStringList() << "Sản phẩm"
+                    << "Trạng thái");
+  ui->tblRoomProducts->horizontalHeader()->setStretchLastSection(true);
+  ui->tblRoomProducts->verticalHeader()->setVisible(false);
+  ui->tblRoomProducts->setEditTriggers(QAbstractItemView::NoEditTriggers);
+  ui->tblRoomProducts->setSelectionBehavior(QAbstractItemView::SelectRows);
+  ui->tblRoomProducts->setSelectionMode(QAbstractItemView::SingleSelection);
 
   // Khởi tạo Socket
   m_socket = new QTcpSocket(this);
@@ -148,6 +162,7 @@ void MainWindow::on_btnLeave_clicked() {
   // Xóa log chat cũ để lần sau vào phòng khác không bị lẫn lộn
   ui->txtRoomLog->clear();
   ui->txtChatLog->clear();
+  ui->tblRoomProducts->setRowCount(0);
 
   // (Tùy chọn) Reset ID phòng hiện tại
   m_currentRoomId = -1;
@@ -182,6 +197,7 @@ void MainWindow::on_btnLogout_clicked() {
   ui->listRooms->clear();
   ui->txtChatLog->clear();
   ui->txtRoomLog->clear();
+  ui->tblRoomProducts->setRowCount(0);
 
   // 4. Chuyển về màn hình Login
   ui->stackedWidget->setCurrentIndex(0);
@@ -327,6 +343,49 @@ void MainWindow::onConnected() {
 }
 
 void MainWindow::onReadyRead() {
+  auto statusToText = [](const QString &status) -> QString {
+    if (status == "ACTIVE")
+      return "Đang đấu giá";
+    if (status == "WAITING")
+      return "Chờ đấu giá";
+    if (status == "SOLD")
+      return "Đã bán";
+    if (status == "NO_SALE")
+      return "No sale";
+    return status;
+  };
+
+  auto statusToColor = [](const QString &status) -> QColor {
+    if (status == "ACTIVE")
+      return QColor("#1E90FF");
+    if (status == "SOLD" || status == "NO_SALE")
+      return QColor("#7f8c8d");
+    return QColor(Qt::black);
+  };
+
+  auto refreshProductTableStyles = [&]() {
+    for (int row = 0; row < ui->tblRoomProducts->rowCount(); ++row) {
+      QTableWidgetItem *nameItem = ui->tblRoomProducts->item(row, 0);
+      QTableWidgetItem *statusItem = ui->tblRoomProducts->item(row, 1);
+      if (!nameItem || !statusItem)
+        continue;
+
+      QString status = nameItem->data(Qt::UserRole + 1).toString();
+      QColor color = statusToColor(status);
+
+      nameItem->setForeground(color);
+      statusItem->setForeground(color);
+
+      QFont f0 = nameItem->font();
+      f0.setBold(status == "ACTIVE");
+      nameItem->setFont(f0);
+
+      QFont f1 = statusItem->font();
+      f1.setBold(status == "ACTIVE");
+      statusItem->setFont(f1);
+    }
+  };
+
   while (m_socket->canReadLine()) {
     QString line = QString::fromUtf8(m_socket->readLine()).trimmed();
     qDebug() << "Server msg:"
@@ -408,12 +467,12 @@ void MainWindow::onReadyRead() {
     }
     // 1. XỬ LÝ VÀO PHÒNG THÀNH CÔNG
     // Server: OK|JOINED|<id>|<name>|<price>
-    else if (line.startsWith("OK|JOINED")) {
-      QStringList parts = line.split('|');
+	    else if (line.startsWith("OK|JOINED")) {
+	      QStringList parts = line.split('|');
 
       // Server gửi:
-      // OK|JOINED|ID|Name|CurrentPrice|BuyNowPrice|Host|Leader|BidCount|ParticipantCount|NextName|NextStart|NextDuration
-      if (parts.size() >= 12) {
+      // OK|JOINED|ID|Name|CurrentPrice|BuyNowPrice|Host|Leader|BidCount|ParticipantCount|...
+      if (parts.size() >= 10) {
         m_currentRoomId = parts[2].toInt();
         QString name = parts[3];
         int price = parts[4].toInt();
@@ -422,13 +481,9 @@ void MainWindow::onReadyRead() {
         QString leader = parts[7];
         int bidCount = parts[8].toInt();
         QString participants = parts[9];
-        QString nextName = parts[10];
-        int nextStart = parts[11].toInt();
-        int nextDuration = parts.size() > 12 ? parts[12].toInt() : 0;
 
         // Cập nhật UI
         ui->lblRoomName->setText("Đang đấu giá: " + name);
-        ui->lblItemName->setText("Sản phẩm: " + name);
         m_currentPriceValue = price;
         m_buyNowPriceValue = buyNow;
         ui->lblCurrentPrice->setText(formatPrice(price));
@@ -442,21 +497,59 @@ void MainWindow::onReadyRead() {
         ui->txtChatLog->clear();
         ui->txtChatLog->append("=== Chat phòng ===");
 
-        updateRoomInfoUI(host, leader, bidCount, participants, nextName,
-                         nextStart, nextDuration);
+        updateRoomInfoUI(host, leader, bidCount, participants);
 
         // Quyết định quyền host dựa vào hostName do server trả về,
         // tránh mất dấu khi danh sách owned bị reset (logout/restart).
         m_isCurrentRoomHost = (host == m_username);
         updateRoomActionPermissions();
 
-        ui->stackedWidget->setCurrentIndex(2);
-      }
-    }
+        // Load full product list for this room
+        ui->tblRoomProducts->setRowCount(0);
+        sendRequest(QString("GET_PRODUCTS|%1\n").arg(m_currentRoomId));
 
-    // 2. XỬ LÝ KHI CÓ NGƯỜI RA GIÁ (BROADCAST)
-    // Server: NEW_BID|<price>|<username>
-    else if (line.startsWith("NEW_BID")) {
+	        ui->stackedWidget->setCurrentIndex(2);
+	      }
+	    }
+
+	    else if (line.startsWith("OK|PRODUCT_LIST")) {
+	      int roomId = line.section('|', 2, 2).toInt();
+	      if (roomId != m_currentRoomId)
+	        continue;
+
+	      QString data = line.section('|', 3);
+	      ui->tblRoomProducts->setRowCount(0);
+
+	      QStringList entries = data.split(';', Qt::SkipEmptyParts);
+	      for (const QString &entry : entries) {
+	        QStringList fields = entry.split(',');
+	        if (fields.size() < 3)
+	          continue;
+
+	        int productId = fields[0].toInt();
+	        QString status = fields[1].trimmed();
+	        QString name = fields[2];
+
+	        int row = ui->tblRoomProducts->rowCount();
+	        ui->tblRoomProducts->insertRow(row);
+
+	        auto *nameItem = new QTableWidgetItem(name);
+	        nameItem->setData(Qt::UserRole, productId);
+	        nameItem->setData(Qt::UserRole + 1, status);
+
+	        auto *statusItem = new QTableWidgetItem(statusToText(status));
+	        statusItem->setData(Qt::UserRole, productId);
+	        statusItem->setData(Qt::UserRole + 1, status);
+
+	        ui->tblRoomProducts->setItem(row, 0, nameItem);
+	        ui->tblRoomProducts->setItem(row, 1, statusItem);
+	      }
+	      refreshProductTableStyles();
+	    }
+
+	    // 2. XỬ LÝ KHI CÓ NGƯỜI RA GIÁ (BROADCAST)
+	    // Server: NEW_BID|<price>|<username>
+	    else if (line.startsWith("NEW_BID")) {
       // In ra chuỗi thô để xem có ký tự lạ không
       qDebug() << "1. Raw string received:" << line;
 
@@ -487,11 +580,36 @@ void MainWindow::onReadyRead() {
       } else {
         qDebug() << "ERROR: Split size wrong! Check protocol separator.";
       }
-    } else if (line.startsWith("ROOM_MEMBER_COUNT")) {
-      // Server: ROOM_MEMBER_COUNT|RoomID|Count
-      QStringList parts = line.split('|');
-      if (parts.size() >= 3) {
-        int roomId = parts[1].toInt();
+	    } else if (line.startsWith("PRODUCT_STATUS")) {
+	      // Server: PRODUCT_STATUS|RoomID|ProductID|Status
+	      QStringList parts = line.split('|');
+	      if (parts.size() >= 4) {
+	        int roomId = parts[1].toInt();
+	        int productId = parts[2].toInt();
+	        QString status = parts[3].trimmed();
+
+	        if (roomId == m_currentRoomId) {
+	          for (int row = 0; row < ui->tblRoomProducts->rowCount(); ++row) {
+	            QTableWidgetItem *nameItem = ui->tblRoomProducts->item(row, 0);
+	            QTableWidgetItem *statusItem = ui->tblRoomProducts->item(row, 1);
+	            if (!nameItem || !statusItem)
+	              continue;
+
+	            if (nameItem->data(Qt::UserRole).toInt() == productId) {
+	              nameItem->setData(Qt::UserRole + 1, status);
+	              statusItem->setData(Qt::UserRole + 1, status);
+	              statusItem->setText(statusToText(status));
+	              break;
+	            }
+	          }
+	          refreshProductTableStyles();
+	        }
+	      }
+	    } else if (line.startsWith("ROOM_MEMBER_COUNT")) {
+	      // Server: ROOM_MEMBER_COUNT|RoomID|Count
+	      QStringList parts = line.split('|');
+	      if (parts.size() >= 3) {
+	        int roomId = parts[1].toInt();
         int count = parts[2].toInt();
         if (roomId == m_currentRoomId) {
           ui->lblParticipants->setText(QString::number(count));
@@ -620,21 +738,20 @@ void MainWindow::onReadyRead() {
           "Tên đăng nhập này đã tồn tại.\nVui lòng chọn tên khác.");
     }
     // ...
-    else if (line.startsWith("NEXT_ITEM")) {
-      // Server: NEXT_ITEM|Name|Price|BuyNow|Duration
-      QStringList parts = line.split('|');
-      if (parts.size() >= 5) {
-        QString newName = parts[1];
+	    else if (line.startsWith("NEXT_ITEM")) {
+	      // Server: NEXT_ITEM|Name|Price|BuyNow|Duration
+	      QStringList parts = line.split('|');
+	      if (parts.size() >= 5) {
+	        QString newName = parts[1];
         int newPrice = parts[2].toInt();
         int newBuyNow = parts[3].toInt();
         int newDuration = parts[4].toInt();
-
-        // 1. Cập nhật UI
-        ui->lblRoomName->setText("Đang đấu giá: " + newName);
-        ui->lblItemName->setText("Sản phẩm: " + newName);
-        m_currentPriceValue = newPrice;
-        m_buyNowPriceValue = newBuyNow;
-        ui->lblCurrentPrice->setText(formatPrice(newPrice));
+	
+	        // 1. Cập nhật UI
+	        ui->lblRoomName->setText("Đang đấu giá: " + newName);
+	        m_currentPriceValue = newPrice;
+	        m_buyNowPriceValue = newBuyNow;
+	        ui->lblCurrentPrice->setText(formatPrice(newPrice));
         ui->lblBuyNowPrice->setText(formatPrice(newBuyNow));
         ui->lcdTimer->display(newDuration);
 
@@ -642,14 +759,13 @@ void MainWindow::onReadyRead() {
         ui->txtRoomLog->append("\n------------------------------");
         ui->txtRoomLog->append(">>> CHUYỂN SANG SẢN PHẨM TIẾP THEO <<<");
         ui->txtRoomLog->append("Sản phẩm: " + newName);
-        ui->txtRoomLog->append("Giá khởi điểm: " + formatPrice(newPrice));
-        ui->lblLeader->setText("-");
-        ui->lblBidCount->setText("0");
-        ui->lblNextInfo->setText("-");
+	        ui->txtRoomLog->append("Giá khởi điểm: " + formatPrice(newPrice));
+	        ui->lblLeader->setText("-");
+	        ui->lblBidCount->setText("0");
 
-        // 3. Reset các nút (nếu bị disable do sold trước đó)
-        ui->btnBid->setEnabled(true);
-        ui->btnBuyNow->setEnabled(true);
+	        // 3. Reset các nút (nếu bị disable do sold trước đó)
+	        ui->btnBid->setEnabled(true);
+	        ui->btnBuyNow->setEnabled(true);
         ui->btnQuickBid->setEnabled(true);
         updateRoomActionPermissions();
 
@@ -766,20 +882,12 @@ QString MainWindow::colorizeName(const QString &name) const {
 }
 
 void MainWindow::updateRoomInfoUI(const QString &host, const QString &leader,
-                                  int bidCount, const QString &participants,
-                                  const QString &nextName, int nextStart,
-                                  int nextDuration) {
+                                  int bidCount,
+                                  const QString &participants) {
   ui->lblHost->setText(host.isEmpty() ? "N/A" : host);
   ui->lblLeader->setText(leader.isEmpty() ? "-" : colorizeName(leader));
   ui->lblBidCount->setText(QString::number(bidCount));
   ui->lblParticipants->setText(participants.isEmpty() ? "0" : participants);
-
-  if (nextName == "-" || nextName.isEmpty()) {
-    ui->lblNextInfo->setText("-");
-  } else {
-    ui->lblNextInfo->setText(nextName + " | " + formatPrice(nextStart) + " | " +
-                             QString::number(nextDuration) + "s");
-  }
 }
 
 // --- User Profile ---

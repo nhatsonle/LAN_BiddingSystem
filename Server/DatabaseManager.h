@@ -45,6 +45,9 @@ public:
   void addRoomMember(int roomId, int userId,
                      const std::string &role = "BIDDER");
 
+  // Product list for UI
+  std::string getProductList(int roomId);
+
   // Recovery
   std::vector<Room> loadOpenRooms();
 

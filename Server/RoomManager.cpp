@@ -37,6 +37,7 @@ int RoomManager::createRoom(std::string roomName, std::vector<Product> products,
 
   // --- LẤY SẢN PHẨM ĐẦU TIÊN LÀM ACTIVE ---
   Product firstP = productsWithId[0];
+  DatabaseManager::getInstance().updateProductStatus(firstP.id, "ACTIVE");
   newRoom.itemName = firstP.name;
   newRoom.currentProductId = firstP.id; // <-- Lưu ID
   newRoom.currentPrice = firstP.startPrice;
@@ -88,6 +89,10 @@ bool RoomManager::loadNextProduct(Room &r) {
   r.bidCount = 0;
   r.isWaitingNextItem = false; // <-- Đảm bảo reset trạng thái
 
+  // Đồng bộ DB: product mới chuyển sang ACTIVE
+  DatabaseManager::getInstance().updateProductStatus(r.currentProductId,
+                                                     "ACTIVE");
+
   std::cout << "[QUEUE] Switched to next item: " << r.itemName << std::endl;
   return true;
 }
@@ -110,6 +115,14 @@ bool RoomManager::buyNow(int roomId, SocketType buyerSocket,
       r.highestBidderUserId = buyerUserId;
       r.highestBidderName = getUsername(buyerSocket);
       r.timeLeft = 0; // Dừng đồng hồ sản phẩm này
+
+      // Update DB status của sản phẩm hiện tại
+      DatabaseManager::getInstance().updateProductStatus(r.currentProductId,
+                                                         "SOLD");
+      if (callback) {
+        callback(r.id, "PRODUCT_STATUS|" + std::to_string(r.id) + "|" +
+                           std::to_string(r.currentProductId) + "|SOLD\n");
+      }
 
       // Chuẩn bị tin nhắn SOLD để trả về ngay cho người gọi (và broadcast)
       outMsg = "SOLD|" + std::to_string(r.buyNowPrice) + "|" +
@@ -149,8 +162,11 @@ bool RoomManager::buyNow(int roomId, SocketType buyerSocket,
         std::this_thread::sleep_for(std::chrono::seconds(2));
 
         // Gửi thông báo chuyển sản phẩm
-        if (callback)
+        if (callback) {
+          callback(r.id, "PRODUCT_STATUS|" + std::to_string(r.id) + "|" +
+                             std::to_string(r.currentProductId) + "|ACTIVE\n");
           callback(r.id, nextMsg);
+        }
 
         // Quan trọng: Đảm bảo phòng vẫn MỞ
         r.isClosed = false;
@@ -218,16 +234,10 @@ bool RoomManager::joinRoom(int roomId, SocketType clientSocket,
       std::string participantNames;
       int participantCount = static_cast<int>(r.participants.size());
 
-      // Next product preview
+      // Next product preview removed (UI đã có danh sách sản phẩm)
       std::string nextName = "-";
       int nextStart = 0;
       int nextDuration = 0;
-      if (!r.productQueue.empty()) {
-        const Product &nxt = r.productQueue.front();
-        nextName = nxt.name;
-        nextStart = nxt.startPrice;
-        nextDuration = nxt.duration;
-      }
 
       outRoomInfo = std::to_string(r.id) + "|" + r.itemName + "|" +
                     std::to_string(r.currentPrice) + "|" +
@@ -268,12 +278,17 @@ bool RoomManager::placeBid(int roomId, int amount, SocketType bidderSocket,
       // Nếu giá bid chạm/qua giá mua ngay -> xử lý mua ngay
       if (amount >= r.buyNowPrice) {
         std::string bidderName = getUsername(bidderSocket);
+        int soldProductId = r.currentProductId;
         r.currentPrice = r.buyNowPrice;
         r.highestBidderSocket = bidderSocket;
         r.highestBidderUserId = bidderUserId;
         r.highestBidderName = bidderName;
         r.bidCount += 1;
         r.timeLeft = 0;
+
+        // Update DB status của sản phẩm vừa chốt
+        DatabaseManager::getInstance().updateProductStatus(soldProductId,
+                                                           "SOLD");
 
         // Lưu DB
         std::vector<int> participantIds;
@@ -287,18 +302,25 @@ bool RoomManager::placeBid(int roomId, int amount, SocketType bidderSocket,
 
         std::string soldMsg =
             "SOLD|" + std::to_string(r.currentPrice) + "|" + bidderName + "\n";
+        std::string soldStatusMsg = "PRODUCT_STATUS|" + std::to_string(roomId) +
+                                    "|" + std::to_string(soldProductId) +
+                                    "|SOLD\n";
 
         if (loadNextProduct(r)) {
           std::string nextMsg = "NEXT_ITEM|" + r.itemName + "|" +
                                 std::to_string(r.currentPrice) + "|" +
                                 std::to_string(r.buyNowPrice) + "|" +
                                 std::to_string(r.initialDuration) + "\n";
-          outBroadcastMsg = soldMsg + nextMsg;
+          std::string activeStatusMsg =
+              "PRODUCT_STATUS|" + std::to_string(roomId) + "|" +
+              std::to_string(r.currentProductId) + "|ACTIVE\n";
+          outBroadcastMsg = soldStatusMsg + soldMsg + activeStatusMsg + nextMsg;
           r.isClosed = false;
         } else {
           r.isClosed = true;
           DatabaseManager::getInstance().updateRoomStatus(r.id, "CLOSED");
-          outBroadcastMsg = soldMsg + "CLOSED|Hết hàng đấu giá\n";
+          outBroadcastMsg =
+              soldStatusMsg + soldMsg + "CLOSED|Hết hàng đấu giá\n";
         }
         return true;
       }
@@ -436,6 +458,8 @@ void RoomManager::updateTimers(BroadcastCallback callback) {
       if (r.timeLeft <= 0) {
         // Hết 3s chờ -> Chuyển sản phẩm
         if (loadNextProduct(r)) {
+          callback(r.id, "PRODUCT_STATUS|" + std::to_string(r.id) + "|" +
+                             std::to_string(r.currentProductId) + "|ACTIVE\n");
           // Format: NEXT_ITEM|Name|Price|BuyNow|Duration
           std::string nextMsg = "NEXT_ITEM|" + r.itemName + "|" +
                                 std::to_string(r.currentPrice) + "|" +
@@ -466,6 +490,11 @@ void RoomManager::updateTimers(BroadcastCallback callback) {
       // --- HẾT GIỜ (TIMEOUT) ---
       // 1. Lưu kết quả
       if (r.highestBidderSocket != -1) {
+        DatabaseManager::getInstance().updateProductStatus(r.currentProductId,
+                                                           "SOLD");
+        callback(r.id, "PRODUCT_STATUS|" + std::to_string(r.id) + "|" +
+                           std::to_string(r.currentProductId) + "|SOLD\n");
+
         std::vector<int> participantIds;
         for (const auto &p : r.participants) {
           if (p.userId > 0)
@@ -485,6 +514,10 @@ void RoomManager::updateTimers(BroadcastCallback callback) {
         callback(r.id, soldMsg);
         std::cout << "winner name: " << winnerName << std::endl;
       } else {
+        DatabaseManager::getInstance().updateProductStatus(r.currentProductId,
+                                                           "NO_SALE");
+        callback(r.id, "PRODUCT_STATUS|" + std::to_string(r.id) + "|" +
+                           std::to_string(r.currentProductId) + "|NO_SALE\n");
         callback(r.id, "Pass_Item|Không ai mua " + r.itemName + "\n");
       }
 

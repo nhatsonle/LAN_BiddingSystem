@@ -59,8 +59,6 @@ private:
   QString formatPrice(int value) const;
   QString colorizeName(const QString &name) const;
   void updateRoomInfoUI(const QString &host, const QString &leader,
-                        int bidCount, const QString &participants,
-                        const QString &nextName, int nextStart,
-                        int nextDuration);
+                        int bidCount, const QString &participants);
 };
 #endif // MAINWINDOW_H

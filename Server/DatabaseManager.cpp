@@ -384,6 +384,29 @@ void DatabaseManager::addRoomMember(int roomId, int userId,
     sqlite3_free(zErrMsg);
 }
 
+std::string DatabaseManager::getProductList(int roomId) {
+  // Format: productId,status,name;productId,status,name;...
+  std::string list;
+  std::string sql =
+      "SELECT id, status, name FROM products WHERE room_id=" +
+      std::to_string(roomId) + " ORDER BY id ASC;";
+
+  auto cb = [](void *data, int argc, char **argv, char **col) -> int {
+    auto *res = static_cast<std::string *>(data);
+    std::string id = (argc > 0 && argv[0]) ? argv[0] : "0";
+    std::string status = (argc > 1 && argv[1]) ? argv[1] : "WAITING";
+    std::string name = (argc > 2 && argv[2]) ? argv[2] : "";
+    *res += id + "," + status + "," + name + ";";
+    return 0;
+  };
+
+  char *zErrMsg = 0;
+  sqlite3_exec(db, sql.c_str(), cb, &list, &zErrMsg);
+  if (zErrMsg)
+    sqlite3_free(zErrMsg);
+  return list;
+}
+
 // Helper structs for loading
 struct RoomData {
   int id;
@@ -398,6 +421,7 @@ struct ProdData {
   int start;
   int buyNow;
   int duration;
+  std::string status;
 };
 
 std::vector<Room> DatabaseManager::loadOpenRooms() {
@@ -450,29 +474,50 @@ std::vector<Room> DatabaseManager::loadOpenRooms() {
       p.start = std::stoi(argv[2]);
       p.buyNow = std::stoi(argv[3]);
       p.duration = std::stoi(argv[4]);
+      p.status = (argv[5] ? argv[5] : "WAITING");
       list->push_back(p);
       return 0;
     };
     std::string sqlP =
-        "SELECT id, name, start_price, buy_now_price, duration FROM products "
-        "WHERE room_id=" +
-        std::to_string(rd.id) + " AND status='WAITING' ORDER BY id ASC;";
+        "SELECT id, name, start_price, buy_now_price, duration, status FROM "
+        "products WHERE room_id=" +
+        std::to_string(rd.id) +
+        " AND status IN ('WAITING','ACTIVE') ORDER BY id ASC;";
 
     sqlite3_exec(db, sqlP.c_str(), cbProd, &pList, &zErrMsg);
     if (pList.empty())
       continue; // Room hết hàng hoặc lỗi -> Bỏ qua
 
     // Setup Active Product
-    ProdData &first = pList[0];
-    room.currentProductId = first.id;
-    room.itemName = first.name;
-    room.currentPrice = first.start;
-    room.buyNowPrice = first.buyNow;
-    room.initialDuration = first.duration;
-    room.timeLeft = first.duration;
+    int activeIndex = -1;
+    for (size_t i = 0; i < pList.size(); ++i) {
+      if (pList[i].status == "ACTIVE") {
+        activeIndex = static_cast<int>(i);
+        break;
+      }
+    }
 
-    // Setup Queue
-    for (size_t i = 1; i < pList.size(); ++i) {
+    // Backward-compat: nếu chưa có ACTIVE, chọn product WAITING đầu tiên làm ACTIVE
+    if (activeIndex == -1) {
+      activeIndex = 0;
+      updateProductStatus(pList[0].id, "ACTIVE");
+      pList[0].status = "ACTIVE";
+    }
+
+    ProdData &active = pList[activeIndex];
+    room.currentProductId = active.id;
+    room.itemName = active.name;
+    room.currentPrice = active.start;
+    room.buyNowPrice = active.buyNow;
+    room.initialDuration = active.duration;
+    room.timeLeft = active.duration;
+
+    // Setup Queue: chỉ lấy các product WAITING (bỏ SOLD/NO_SALE, bỏ ACTIVE)
+    for (size_t i = 0; i < pList.size(); ++i) {
+      if (static_cast<int>(i) == activeIndex)
+        continue;
+      if (pList[i].status != "WAITING")
+        continue;
       Product p;
       p.id = pList[i].id;
       p.name = pList[i].name;

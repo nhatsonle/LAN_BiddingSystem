@@ -2,10 +2,27 @@
 #include "DatabaseManager.h"
 #include <algorithm>
 #include <chrono>
+#include <cerrno>
 #include <cstring>
 #include <iostream>
 #include <sstream>
 #include <thread>
+
+static bool sendAll(SocketType sock, const char *data, size_t len) {
+  size_t totalSent = 0;
+  while (totalSent < len) {
+    ssize_t sent = send(sock, data + totalSent, len - totalSent, 0);
+    if (sent < 0) {
+      if (errno == EINTR)
+        continue;
+      return false;
+    }
+    if (sent == 0)
+      return false;
+    totalSent += static_cast<size_t>(sent);
+  }
+  return true;
+}
 
 AuctionServer::AuctionServer(int port) : port(port) {}
 
@@ -285,6 +302,13 @@ std::string AuctionServer::processCommand(SocketType clientSocket,
     std::string history =
         DatabaseManager::getInstance().getHistoryList(username);
     return "OK|HISTORY|" + history;
+  } else if (cmd == "GET_PRODUCTS") { // GET_PRODUCTS|RoomID
+    if (tokens.size() < 2)
+      return "ERR|MISSING_ARGS";
+
+    int roomId = std::stoi(tokens[1]);
+    std::string list = DatabaseManager::getInstance().getProductList(roomId);
+    return "OK|PRODUCT_LIST|" + std::to_string(roomId) + "|" + list;
   } else if (cmd == "LOGOUT") {
     return "OK|LOGOUT_SUCCESS";
   }
@@ -321,7 +345,7 @@ void AuctionServer::handleClient(SocketType clientSocket) {
       std::string response = processCommand(clientSocket, msg);
       if (!response.empty()) {
         response += "\n";
-        send(clientSocket, response.c_str(), response.length(), 0);
+        sendAll(clientSocket, response.c_str(), response.length());
       }
     }
   }
@@ -346,7 +370,7 @@ void AuctionServer::broadcastToRoom(int roomId, const std::string &msg) {
       RoomManager::getInstance().getParticipants(roomId);
 
   for (auto sock : targets) {
-    send(sock, msg.c_str(), msg.length(), 0);
+    sendAll(sock, msg.c_str(), msg.length());
   }
   std::cout << "[BROADCAST Room " << roomId << "]: " << msg;
 }
