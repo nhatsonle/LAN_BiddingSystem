@@ -219,8 +219,8 @@ std::string AuctionServer::processCommand(SocketType clientSocket,
           std::to_string(RoomManager::getInstance().getParticipantCount(roomId)) +
           "\n";
       broadcastToRoom(roomId, countMsg);
-      // Trả về thêm 1 dòng chat để chính người tham gia cũng thấy trong log
-      return "OK|JOINED|" + info + "\n" + joinMsg;
+      // Response chỉ gồm 1 dòng OK|JOINED (chat join được gửi qua broadcast)
+      return "OK|JOINED|" + info;
     }
     return "ERR|ROOM_NOT_FOUND";
   } else if (cmd == "BID") { // BID|ID|Amount
@@ -344,7 +344,9 @@ void AuctionServer::handleClient(SocketType clientSocket) {
 
       std::string response = processCommand(clientSocket, msg);
       if (!response.empty()) {
-        response += "\n";
+        if (response.back() != '\n') {
+          response += "\n";
+        }
         sendAll(clientSocket, response.c_str(), response.length());
       }
     }

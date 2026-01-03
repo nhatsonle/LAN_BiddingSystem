@@ -234,18 +234,11 @@ bool RoomManager::joinRoom(int roomId, SocketType clientSocket,
       std::string participantNames;
       int participantCount = static_cast<int>(r.participants.size());
 
-      // Next product preview removed (UI đã có danh sách sản phẩm)
-      std::string nextName = "-";
-      int nextStart = 0;
-      int nextDuration = 0;
-
       outRoomInfo = std::to_string(r.id) + "|" + r.itemName + "|" +
                     std::to_string(r.currentPrice) + "|" +
                     std::to_string(r.buyNowPrice) + "|" + r.hostName + "|" +
                     r.highestBidderName + "|" + std::to_string(r.bidCount) +
-                    "|" + std::to_string(participantCount) + "|" + nextName +
-                    "|" + std::to_string(nextStart) + "|" +
-                    std::to_string(nextDuration);
+                    "|" + std::to_string(participantCount);
       // -------------------------
 
       return true;

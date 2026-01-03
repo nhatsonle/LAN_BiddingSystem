@@ -261,6 +261,12 @@ void MainWindow::on_btnJoin_clicked() {
   if (m_socket->state() == QAbstractSocket::ConnectedState) {
     m_currentRoomId = roomId;
 
+    // Reset UI room trước khi join để tránh xoá mất broadcast (CHAT/COUNT) đến sớm
+    ui->txtRoomLog->clear();
+    ui->txtRoomLog->append("--- Bắt đầu phiên đấu giá ---");
+    ui->txtChatLog->clear();
+    ui->txtChatLog->append("=== Chat phòng ===");
+
     // Gửi lệnh JOIN_ROOM|ID
     QString msg = "JOIN_ROOM|" + QString::number(roomId) + "\n";
     m_socket->write(msg.toUtf8());
@@ -471,7 +477,7 @@ void MainWindow::onReadyRead() {
 	      QStringList parts = line.split('|');
 
       // Server gửi:
-      // OK|JOINED|ID|Name|CurrentPrice|BuyNowPrice|Host|Leader|BidCount|ParticipantCount|...
+      // OK|JOINED|ID|Name|CurrentPrice|BuyNowPrice|Host|Leader|BidCount|ParticipantCount
       if (parts.size() >= 10) {
         m_currentRoomId = parts[2].toInt();
         QString name = parts[3];
@@ -487,17 +493,12 @@ void MainWindow::onReadyRead() {
         m_currentPriceValue = price;
         m_buyNowPriceValue = buyNow;
         ui->lblCurrentPrice->setText(formatPrice(price));
+	
+	        // --- HIỂN THỊ GIÁ MUA NGAY ---
+	        ui->lblBuyNowPrice->setText(formatPrice(buyNow));
+	        // -----------------------------
 
-        // --- HIỂN THỊ GIÁ MUA NGAY ---
-        ui->lblBuyNowPrice->setText(formatPrice(buyNow));
-        // -----------------------------
-
-        ui->txtRoomLog->clear();
-        ui->txtRoomLog->append("--- Bắt đầu phiên đấu giá ---");
-        ui->txtChatLog->clear();
-        ui->txtChatLog->append("=== Chat phòng ===");
-
-        updateRoomInfoUI(host, leader, bidCount, participants);
+	        updateRoomInfoUI(host, leader, bidCount, participants);
 
         // Quyết định quyền host dựa vào hostName do server trả về,
         // tránh mất dấu khi danh sách owned bị reset (logout/restart).
