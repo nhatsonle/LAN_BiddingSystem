@@ -32,9 +32,9 @@ MainWindow::MainWindow(QWidget *parent)
   ui->tblRoomProducts->setSelectionBehavior(QAbstractItemView::SelectRows);
   ui->tblRoomProducts->setSelectionMode(QAbstractItemView::SingleSelection);
 
-  m_btnMyRoomsButton = new QPushButton("My Rooms", ui->pageLobby);
-  m_btnMyRoomsButton->setGeometry(260, 480, 101, 31);
-  m_btnMyRoomsButton->setFixedSize(101, 31);
+  m_btnMyRoomsButton = new QPushButton("Phòng của tôi", ui->pageLobby);
+  m_btnMyRoomsButton->setGeometry(260, 480, 200, 50);
+  m_btnMyRoomsButton->setFixedSize(160, 31);
   connect(m_btnMyRoomsButton, &QPushButton::clicked, this,
           &MainWindow::showMyRoomsView);
 
@@ -42,7 +42,7 @@ MainWindow::MainWindow(QWidget *parent)
   QVBoxLayout *roomLayout = new QVBoxLayout(m_pageMyRooms);
   roomLayout->setContentsMargins(20, 20, 20, 20);
   roomLayout->setSpacing(12);
-  QLabel *roomsTitle = new QLabel("My Rooms", m_pageMyRooms);
+  QLabel *roomsTitle = new QLabel("Phòng của tôi", m_pageMyRooms);
   QFont titleFont = roomsTitle->font();
   titleFont.setPointSize(14);
   titleFont.setBold(true);
