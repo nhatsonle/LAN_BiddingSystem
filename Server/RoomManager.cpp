@@ -2,21 +2,58 @@
 #include "DatabaseManager.h"
 #include <algorithm>
 #include <chrono>
+#include <ctime>
+#include <iomanip>
 #include <iostream>
+#include <sstream>
 #include <thread>
 
+static bool parseStartTime(const std::string &input,
+                           std::chrono::system_clock::time_point &out) {
+  if (input.empty())
+    return false;
+  std::tm tm = {};
+  std::istringstream ss(input);
+  ss >> std::get_time(&tm, "%Y-%m-%d %H:%M:%S");
+  if (ss.fail())
+    return false;
+  tm.tm_isdst = -1;
+  std::time_t timeVal = std::mktime(&tm);
+  if (timeVal == -1)
+    return false;
+  out = std::chrono::system_clock::from_time_t(timeVal);
+  return true;
+}
+
 int RoomManager::createRoom(std::string roomName, std::vector<Product> products,
-                            SocketType ownerSocket, int ownerUserId) {
+                            SocketType ownerSocket, int ownerUserId,
+                            const std::string &startTime) {
   std::lock_guard<std::recursive_mutex> lock(roomsMutex);
 
   if (products.empty())
     return -1;
 
   Room newRoom;
+  newRoom.hasStartTime = false;
+  newRoom.startTimeString.clear();
+  newRoom.isWaitingForStart = false;
+  if (!startTime.empty()) {
+    std::chrono::system_clock::time_point tp;
+    if (parseStartTime(startTime, tp)) {
+      newRoom.hasStartTime = true;
+      newRoom.startTime = tp;
+      newRoom.startTimeString = startTime;
+      if (!newRoom.hasStarted()) {
+        newRoom.isWaitingForStart = true;
+      }
+    } else {
+      newRoom.startTimeString = startTime;
+    }
+  }
   // newRoom.id = roomIdCounter++;
   // THAY ĐỔI: Gọi DB để lấy ID phòng (Persistent)
   int dbRoomId =
-      DatabaseManager::getInstance().createRoom(roomName, ownerUserId);
+      DatabaseManager::getInstance().createRoom(roomName, ownerUserId, startTime);
   if (dbRoomId == -1)
     return -1;
   newRoom.id = dbRoomId;
@@ -29,7 +66,8 @@ int RoomManager::createRoom(std::string roomName, std::vector<Product> products,
   for (size_t i = 0; i < productsWithId.size(); ++i) {
     int pid = DatabaseManager::getInstance().saveProduct(
         newRoom.id, productsWithId[i].name, productsWithId[i].startPrice,
-        productsWithId[i].buyNowPrice, productsWithId[i].duration);
+        productsWithId[i].buyNowPrice, productsWithId[i].duration,
+        productsWithId[i].description);
     productsWithId[i].id = pid;
     // Đảm bảo duration không vượt quá 30 phút (phù hợp DB)
     productsWithId[i].duration = std::min(productsWithId[i].duration, 1800);
@@ -37,6 +75,7 @@ int RoomManager::createRoom(std::string roomName, std::vector<Product> products,
 
   // --- LẤY SẢN PHẨM ĐẦU TIÊN LÀM ACTIVE ---
   Product firstP = productsWithId[0];
+  DatabaseManager::getInstance().updateProductStatus(firstP.id, "ACTIVE");
   newRoom.itemName = firstP.name;
   newRoom.currentProductId = firstP.id; // <-- Lưu ID
   newRoom.currentPrice = firstP.startPrice;
@@ -88,6 +127,10 @@ bool RoomManager::loadNextProduct(Room &r) {
   r.bidCount = 0;
   r.isWaitingNextItem = false; // <-- Đảm bảo reset trạng thái
 
+  // Đồng bộ DB: product mới chuyển sang ACTIVE
+  DatabaseManager::getInstance().updateProductStatus(r.currentProductId,
+                                                     "ACTIVE");
+
   std::cout << "[QUEUE] Switched to next item: " << r.itemName << std::endl;
   return true;
 }
@@ -110,6 +153,14 @@ bool RoomManager::buyNow(int roomId, SocketType buyerSocket,
       r.highestBidderUserId = buyerUserId;
       r.highestBidderName = getUsername(buyerSocket);
       r.timeLeft = 0; // Dừng đồng hồ sản phẩm này
+
+      // Update DB status của sản phẩm hiện tại
+      DatabaseManager::getInstance().updateProductStatus(r.currentProductId,
+                                                         "SOLD");
+      if (callback) {
+        callback(r.id, "PRODUCT_STATUS|" + std::to_string(r.id) + "|" +
+                           std::to_string(r.currentProductId) + "|SOLD\n");
+      }
 
       // Chuẩn bị tin nhắn SOLD để trả về ngay cho người gọi (và broadcast)
       outMsg = "SOLD|" + std::to_string(r.buyNowPrice) + "|" +
@@ -149,8 +200,11 @@ bool RoomManager::buyNow(int roomId, SocketType buyerSocket,
         std::this_thread::sleep_for(std::chrono::seconds(2));
 
         // Gửi thông báo chuyển sản phẩm
-        if (callback)
+        if (callback) {
+          callback(r.id, "PRODUCT_STATUS|" + std::to_string(r.id) + "|" +
+                             std::to_string(r.currentProductId) + "|ACTIVE\n");
           callback(r.id, nextMsg);
+        }
 
         // Quan trọng: Đảm bảo phòng vẫn MỞ
         r.isClosed = false;
@@ -218,24 +272,14 @@ bool RoomManager::joinRoom(int roomId, SocketType clientSocket,
       std::string participantNames;
       int participantCount = static_cast<int>(r.participants.size());
 
-      // Next product preview
-      std::string nextName = "-";
-      int nextStart = 0;
-      int nextDuration = 0;
-      if (!r.productQueue.empty()) {
-        const Product &nxt = r.productQueue.front();
-        nextName = nxt.name;
-        nextStart = nxt.startPrice;
-        nextDuration = nxt.duration;
-      }
-
+      std::string startField = r.startTimeString;
+      std::string startedFlag = r.hasStarted() ? "1" : "0";
       outRoomInfo = std::to_string(r.id) + "|" + r.itemName + "|" +
                     std::to_string(r.currentPrice) + "|" +
                     std::to_string(r.buyNowPrice) + "|" + r.hostName + "|" +
                     r.highestBidderName + "|" + std::to_string(r.bidCount) +
-                    "|" + std::to_string(participantCount) + "|" + nextName +
-                    "|" + std::to_string(nextStart) + "|" +
-                    std::to_string(nextDuration);
+                    "|" + std::to_string(participantCount) + "|" + startField +
+                    "|" + startedFlag;
       // -------------------------
 
       return true;
@@ -255,8 +299,10 @@ bool RoomManager::isUserLoggedIn(const std::string &username) {
 }
 
 bool RoomManager::placeBid(int roomId, int amount, SocketType bidderSocket,
-                           std::string &outBroadcastMsg) {
+                           std::string &outBroadcastMsg,
+                           std::string &outError) {
   std::lock_guard<std::recursive_mutex> lock(roomsMutex);
+  outError.clear();
   for (auto &r : rooms) {
     if (r.id == roomId) {
       // Kiểm tra: Nếu phòng đã đóng thì không cho bid
@@ -265,15 +311,24 @@ bool RoomManager::placeBid(int roomId, int amount, SocketType bidderSocket,
       int bidderUserId = getUserId(bidderSocket);
       if (bidderUserId == r.hostUserId)
         return false; // chủ phòng không được bid
+      if (!r.hasStarted()) {
+        outError = "ERR|ROOM_NOT_STARTED";
+        return false;
+      }
       // Nếu giá bid chạm/qua giá mua ngay -> xử lý mua ngay
       if (amount >= r.buyNowPrice) {
         std::string bidderName = getUsername(bidderSocket);
+        int soldProductId = r.currentProductId;
         r.currentPrice = r.buyNowPrice;
         r.highestBidderSocket = bidderSocket;
         r.highestBidderUserId = bidderUserId;
         r.highestBidderName = bidderName;
         r.bidCount += 1;
         r.timeLeft = 0;
+
+        // Update DB status của sản phẩm vừa chốt
+        DatabaseManager::getInstance().updateProductStatus(soldProductId,
+                                                           "SOLD");
 
         // Lưu DB
         std::vector<int> participantIds;
@@ -287,18 +342,25 @@ bool RoomManager::placeBid(int roomId, int amount, SocketType bidderSocket,
 
         std::string soldMsg =
             "SOLD|" + std::to_string(r.currentPrice) + "|" + bidderName + "\n";
+        std::string soldStatusMsg = "PRODUCT_STATUS|" + std::to_string(roomId) +
+                                    "|" + std::to_string(soldProductId) +
+                                    "|SOLD\n";
 
         if (loadNextProduct(r)) {
           std::string nextMsg = "NEXT_ITEM|" + r.itemName + "|" +
                                 std::to_string(r.currentPrice) + "|" +
                                 std::to_string(r.buyNowPrice) + "|" +
                                 std::to_string(r.initialDuration) + "\n";
-          outBroadcastMsg = soldMsg + nextMsg;
+          std::string activeStatusMsg =
+              "PRODUCT_STATUS|" + std::to_string(roomId) + "|" +
+              std::to_string(r.currentProductId) + "|ACTIVE\n";
+          outBroadcastMsg = soldStatusMsg + soldMsg + activeStatusMsg + nextMsg;
           r.isClosed = false;
         } else {
           r.isClosed = true;
           DatabaseManager::getInstance().updateRoomStatus(r.id, "CLOSED");
-          outBroadcastMsg = soldMsg + "CLOSED|Hết hàng đấu giá\n";
+          outBroadcastMsg =
+              soldStatusMsg + soldMsg + "CLOSED|Hết hàng đấu giá\n";
         }
         return true;
       }
@@ -322,10 +384,29 @@ bool RoomManager::placeBid(int roomId, int amount, SocketType bidderSocket,
                           bidderName + "|" + std::to_string(r.bidCount) + "\n";
         return true;
       }
+      outError = "ERR|PRICE_TOO_LOW";
       return false;
     }
   }
   return false;
+}
+
+bool RoomManager::isRoomStarted(int roomId) {
+  std::lock_guard<std::recursive_mutex> lock(roomsMutex);
+  for (const auto &r : rooms) {
+    if (r.id == roomId) {
+      return r.hasStarted();
+    }
+  }
+  return false;
+}
+
+bool RoomManager::canModifyRoom(const Room &room) const {
+  if (room.isClosed)
+    return false;
+  if (!room.hasStartTime)
+    return false;
+  return !room.hasStarted();
 }
 
 std::vector<SocketType> RoomManager::getParticipants(int roomId) {
@@ -342,8 +423,19 @@ std::vector<SocketType> RoomManager::getParticipants(int roomId) {
   return {};
 }
 
-void RoomManager::removeClient(SocketType clientSocket) {
+int RoomManager::getParticipantCount(int roomId) {
   std::lock_guard<std::recursive_mutex> lock(roomsMutex);
+  for (const auto &r : rooms) {
+    if (r.id == roomId) {
+      return static_cast<int>(r.participants.size());
+    }
+  }
+  return 0;
+}
+
+std::vector<std::pair<int, int>> RoomManager::removeClient(SocketType clientSocket) {
+  std::lock_guard<std::recursive_mutex> lock(roomsMutex);
+  std::vector<std::pair<int, int>> affectedRooms;
 
   // Xóa khỏi userMap
   if (userMap.count(clientSocket)) {
@@ -359,10 +451,13 @@ void RoomManager::removeClient(SocketType clientSocket) {
 
     if (it != room.participants.end()) {
       room.participants.erase(it, room.participants.end());
+      affectedRooms.push_back({room.id, static_cast<int>(room.participants.size())});
       std::cout << "[INFO] Removed client " << clientSocket << " from Room "
                 << room.id << std::endl;
     }
   }
+
+  return affectedRooms;
 }
 
 void RoomManager::loginUser(SocketType sock, int userId, std::string name) {
@@ -414,6 +509,17 @@ void RoomManager::updateTimers(BroadcastCallback callback) {
       continue;
     if (r.participants.empty())
       continue;
+    if (r.isWaitingForStart) {
+      if (!r.hasStarted())
+        continue;
+      r.isWaitingForStart = false;
+      std::string startMsg =
+          "ROOM_STATUS|" + std::to_string(r.id) + "|STARTED";
+      if (!r.startTimeString.empty())
+        startMsg += "|" + r.startTimeString;
+      startMsg += "\n";
+      callback(r.id, startMsg);
+    }
 
     r.timeLeft--;
 
@@ -422,6 +528,8 @@ void RoomManager::updateTimers(BroadcastCallback callback) {
       if (r.timeLeft <= 0) {
         // Hết 3s chờ -> Chuyển sản phẩm
         if (loadNextProduct(r)) {
+          callback(r.id, "PRODUCT_STATUS|" + std::to_string(r.id) + "|" +
+                             std::to_string(r.currentProductId) + "|ACTIVE\n");
           // Format: NEXT_ITEM|Name|Price|BuyNow|Duration
           std::string nextMsg = "NEXT_ITEM|" + r.itemName + "|" +
                                 std::to_string(r.currentPrice) + "|" +
@@ -452,6 +560,11 @@ void RoomManager::updateTimers(BroadcastCallback callback) {
       // --- HẾT GIỜ (TIMEOUT) ---
       // 1. Lưu kết quả
       if (r.highestBidderSocket != -1) {
+        DatabaseManager::getInstance().updateProductStatus(r.currentProductId,
+                                                           "SOLD");
+        callback(r.id, "PRODUCT_STATUS|" + std::to_string(r.id) + "|" +
+                           std::to_string(r.currentProductId) + "|SOLD\n");
+
         std::vector<int> participantIds;
         for (const auto &p : r.participants) {
           if (p.userId > 0)
@@ -471,6 +584,10 @@ void RoomManager::updateTimers(BroadcastCallback callback) {
         callback(r.id, soldMsg);
         std::cout << "winner name: " << winnerName << std::endl;
       } else {
+        DatabaseManager::getInstance().updateProductStatus(r.currentProductId,
+                                                           "NO_SALE");
+        callback(r.id, "PRODUCT_STATUS|" + std::to_string(r.id) + "|" +
+                           std::to_string(r.currentProductId) + "|NO_SALE\n");
         callback(r.id, "Pass_Item|Không ai mua " + r.itemName + "\n");
       }
 
@@ -479,6 +596,227 @@ void RoomManager::updateTimers(BroadcastCallback callback) {
       r.timeLeft = 3; // Chờ 3 giây
     }
   }
+}
+
+bool RoomManager::editRoom(int roomId, SocketType ownerSocket,
+                           const std::string &name,
+                           const std::vector<Product> &products,
+                           const std::string &startTime, std::string &outError) {
+  std::lock_guard<std::recursive_mutex> lock(roomsMutex);
+
+  int ownerUserId = getUserId(ownerSocket);
+  if (ownerUserId <= 0) {
+    outError = "ERR|NOT_LOGGED_IN";
+    return false;
+  }
+
+  if (products.empty()) {
+    outError = "ERR|NO_VALID_PRODUCTS";
+    return false;
+  }
+
+  std::chrono::system_clock::time_point parsedStart;
+  if (!parseStartTime(startTime, parsedStart)) {
+    outError = "ERR|INVALID_START_TIME";
+    return false;
+  }
+
+  auto now = std::chrono::system_clock::now();
+  if (parsedStart <= now) {
+    outError = "ERR|START_PASSED";
+    return false;
+  }
+  if (std::chrono::duration_cast<std::chrono::minutes>(parsedStart - now)
+          .count() < 5) {
+    outError = "ERR|START_TOO_SOON";
+    return false;
+  }
+
+  for (auto &r : rooms) {
+    if (r.id != roomId)
+      continue;
+
+    if (r.hostUserId != ownerUserId) {
+      outError = "ERR|NOT_HOST";
+      return false;
+    }
+
+    if (!canModifyRoom(r)) {
+      outError = "ERR|TOO_LATE";
+      return false;
+    }
+
+    DatabaseManager::getInstance().deleteProductsForRoom(roomId);
+    DatabaseManager::getInstance().updateRoomName(roomId, name);
+    DatabaseManager::getInstance().updateRoomStartTime(roomId, startTime);
+    DatabaseManager::getInstance().updateRoomStatus(roomId, "OPEN");
+
+    std::vector<Product> productsWithId = products;
+    for (auto &p : productsWithId) {
+      int pid = DatabaseManager::getInstance().saveProduct(
+          roomId, p.name, p.startPrice, p.buyNowPrice, p.duration,
+          p.description);
+      if (pid == -1) {
+        outError = "ERR|DB_ERROR";
+        return false;
+      }
+      p.id = pid;
+      p.duration = std::min(p.duration, 1800);
+    }
+
+    Product firstP = productsWithId[0];
+    DatabaseManager::getInstance().updateProductStatus(firstP.id, "ACTIVE");
+
+    std::queue<Product> emptyQueue;
+    std::swap(r.productQueue, emptyQueue);
+
+    for (size_t i = 1; i < productsWithId.size(); ++i) {
+      r.productQueue.push(productsWithId[i]);
+    }
+
+    int cappedDuration = std::min(firstP.duration, 1800);
+    r.itemName = firstP.name;
+    r.currentProductId = firstP.id;
+    r.currentPrice = firstP.startPrice;
+    r.buyNowPrice = firstP.buyNowPrice;
+    r.initialDuration = cappedDuration;
+    r.timeLeft = cappedDuration;
+    r.highestBidderSocket = -1;
+    r.highestBidderUserId = -1;
+    r.highestBidderName.clear();
+    r.bidCount = 0;
+    r.isClosed = false;
+    r.isWaitingNextItem = false;
+    r.hasStartTime = true;
+    r.startTime = parsedStart;
+    r.startTimeString = startTime;
+    r.isWaitingForStart = (parsedStart > now);
+    return true;
+  }
+
+  outError = "ERR|ROOM_NOT_FOUND";
+  return false;
+}
+
+bool RoomManager::stopRoom(int roomId, SocketType ownerSocket,
+                           std::string &broadcastMsg, std::string &outError) {
+  std::lock_guard<std::recursive_mutex> lock(roomsMutex);
+  int ownerUserId = getUserId(ownerSocket);
+  if (ownerUserId <= 0) {
+    outError = "ERR|NOT_LOGGED_IN";
+    return false;
+  }
+
+  for (auto &r : rooms) {
+    if (r.id != roomId)
+      continue;
+
+    if (r.hostUserId != ownerUserId) {
+      outError = "ERR|NOT_HOST";
+      return false;
+    }
+
+    if (r.isClosed) {
+      outError = "ERR|ROOM_ALREADY_CLOSED";
+      return false;
+    }
+
+    r.isClosed = true;
+    DatabaseManager::getInstance().updateRoomStatus(roomId, "STOPPED");
+    broadcastMsg = "ROOM_STATUS|" + std::to_string(roomId) + "|STOPPED\n" +
+                   "CHAT|System|Auction room has been stopped by the host\n";
+    return true;
+  }
+
+  outError = "ERR|ROOM_NOT_FOUND";
+  return false;
+}
+
+bool RoomManager::getRoomEditData(int roomId, SocketType ownerSocket,
+                                  std::string &outName,
+                                  std::string &outStartTime,
+                                  std::string &outProductsPayload,
+                                  std::string &outError) {
+  std::lock_guard<std::recursive_mutex> lock(roomsMutex);
+  outError.clear();
+  outName.clear();
+  outStartTime.clear();
+  outProductsPayload.clear();
+
+  int ownerUserId = getUserId(ownerSocket);
+  if (ownerUserId <= 0) {
+    outError = "ERR|NOT_LOGGED_IN";
+    return false;
+  }
+
+  Room *roomPtr = nullptr;
+  for (auto &r : rooms) {
+    if (r.id == roomId) {
+      roomPtr = &r;
+      break;
+    }
+  }
+  if (!roomPtr) {
+    outError = "ERR|ROOM_NOT_FOUND";
+    return false;
+  }
+
+  if (roomPtr->hostUserId != ownerUserId) {
+    outError = "ERR|NOT_HOST";
+    return false;
+  }
+
+  if (!canModifyRoom(*roomPtr)) {
+    outError = "ERR|TOO_LATE";
+    return false;
+  }
+
+  int createdBy = -1;
+  std::string name;
+  std::string startTimeStr;
+  std::string status;
+  if (!DatabaseManager::getInstance().getRoomMeta(roomId, createdBy, name,
+                                                 startTimeStr, status)) {
+    outError = "ERR|ROOM_NOT_FOUND";
+    return false;
+  }
+  if (createdBy != ownerUserId) {
+    outError = "ERR|NOT_HOST";
+    return false;
+  }
+  if (status == "STOPPED" || status == "CLOSED") {
+    outError = "ERR|ROOM_ALREADY_CLOSED";
+    return false;
+  }
+
+  std::chrono::system_clock::time_point parsedStart;
+  if (!parseStartTime(startTimeStr, parsedStart)) {
+    outError = "ERR|INVALID_START_TIME";
+    return false;
+  }
+
+  auto now = std::chrono::system_clock::now();
+  if (parsedStart <= now) {
+    outError = "ERR|START_PASSED";
+    return false;
+  }
+  if (std::chrono::duration_cast<std::chrono::minutes>(parsedStart - now)
+          .count() < 5) {
+    outError = "ERR|START_TOO_SOON";
+    return false;
+  }
+
+  std::string payload =
+      DatabaseManager::getInstance().getProductPayloadForEdit(roomId);
+  if (payload.empty()) {
+    outError = "ERR|NO_VALID_PRODUCTS";
+    return false;
+  }
+
+  outName = name;
+  outStartTime = startTimeStr;
+  outProductsPayload = payload;
+  return true;
 }
 
 void RoomManager::loadState() {

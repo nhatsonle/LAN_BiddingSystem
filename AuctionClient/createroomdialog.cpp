@@ -3,6 +3,7 @@
 #include <QMessageBox>
 #include <QDebug>
 #include <QDateTime>
+#include <QRegularExpression>
 
 // --- Constructor: Khớp với header ---
 CreateRoomDialog::CreateRoomDialog(QWidget *parent) :
@@ -31,10 +32,10 @@ CreateRoomDialog::CreateRoomDialog(QWidget *parent) :
     ui->spinStartPrice->setGroupSeparatorShown(true);
     ui->spinBuyNow->setGroupSeparatorShown(true);
 
-    // Cấu hình bảng hiển thị (4 cột)
-    ui->tblProducts->setColumnCount(4);
+    // Cấu hình bảng hiển thị
+    ui->tblProducts->setColumnCount(5);
     QStringList headers;
-    headers << "Tên SP" << "Giá KĐ" << "Mua Ngay" << "Thời gian";
+    headers << "Tên SP" << "Giá KĐ" << "Mua Ngay" << "Thời gian" << "Mô tả";
     ui->tblProducts->setHorizontalHeaderLabels(headers);
 
     // Tự động giãn cột cuối cho đẹp
@@ -50,7 +51,7 @@ CreateRoomDialog::CreateRoomDialog(QWidget *parent) :
     connect(ui->buttonBox, &QDialogButtonBox::accepted, this, &CreateRoomDialog::onVerify);
     connect(ui->buttonBox, &QDialogButtonBox::rejected, this, &QDialog::reject);
 
-    ui->dtStartTime->setDateTime(QDateTime::currentDateTime());
+    // Không reset start time khi thao tác sản phẩm (start time thuộc về phòng).
 }
 
 CreateRoomDialog::~CreateRoomDialog()
@@ -60,10 +61,11 @@ CreateRoomDialog::~CreateRoomDialog()
 // Hàm reset form tiện ích
 void CreateRoomDialog::resetInputForm() {
     ui->txtName->clear();
+    ui->txtDescription->clear();
     ui->spinStartPrice->setValue(0);
     ui->spinBuyNow->setValue(0);
     ui->spinDuration->setValue(30); // Giá trị mặc định
-    ui->dtStartTime->setDateTime(QDateTime::currentDateTime());
+    // start time giu nguyen khi thao tac san pham
     ui->txtName->setFocus();
 
     // Reset trạng thái về "Thêm mới"
@@ -81,6 +83,7 @@ void CreateRoomDialog::resetInputForm() {
 void CreateRoomDialog::on_btnAddProduct_clicked() {
     // 1. Lấy dữ liệu
     QString name = ui->txtName->text().trimmed();
+    QString description = ui->txtDescription->text().trimmed();
     int start = ui->spinStartPrice->value();
     int buyNow = ui->spinBuyNow->value();
     int duration = ui->spinDuration->value();
@@ -94,16 +97,28 @@ void CreateRoomDialog::on_btnAddProduct_clicked() {
         QMessageBox::warning(this, "Lỗi", "Giá mua ngay phải lớn hơn giá khởi điểm!");
         return;
     }
-    if (name.contains(';') || name.contains(',')) {
-        QMessageBox::warning(this, "Lỗi", "Tên không được chứa ký tự đặc biệt (; ,)");
+    if (name.contains(';') || name.contains(',') || name.contains('|')) {
+        QMessageBox::warning(this, "Lỗi", "Tên không được chứa ký tự đặc biệt (; , |)");
         return;
+    }
+    if (description.contains(';') || description.contains(',') || description.contains('|')) {
+        QMessageBox::warning(this, "Lỗi", "Mô tả không được chứa ký tự đặc biệt (; , |)");
+        return;
+    }
+    if (!description.isEmpty()) {
+        QStringList words =
+            description.split(QRegularExpression("\\s+"), Qt::SkipEmptyParts);
+        if (words.size() > 50) {
+            QMessageBox::warning(this, "Lỗi", "Mô tả tối đa 50 chữ.");
+            return;
+        }
     }
 
     // --- LOGIC MỚI: KIỂM TRA CHẾ ĐỘ ---
 
     if (m_editingRow == -1) {
         // === TRƯỜNG HỢP 1: THÊM MỚI ===
-        m_products.push_back({name, start, buyNow, duration});
+        m_products.push_back({name, description, start, buyNow, duration});
 
         int row = ui->tblProducts->rowCount();
         ui->tblProducts->insertRow(row);
@@ -111,17 +126,19 @@ void CreateRoomDialog::on_btnAddProduct_clicked() {
         ui->tblProducts->setItem(row, 1, new QTableWidgetItem(QString::number(start)));
         ui->tblProducts->setItem(row, 2, new QTableWidgetItem(QString::number(buyNow)));
         ui->tblProducts->setItem(row, 3, new QTableWidgetItem(QString::number(duration)));
+        ui->tblProducts->setItem(row, 4, new QTableWidgetItem(description));
     }
     else {
         // === TRƯỜNG HỢP 2: CẬP NHẬT (LƯU SỬA) ===
         // 1. Cập nhật vào vector
-        m_products[m_editingRow] = {name, start, buyNow, duration};
+        m_products[m_editingRow] = {name, description, start, buyNow, duration};
 
         // 2. Cập nhật lại Table Widget
         ui->tblProducts->item(m_editingRow, 0)->setText(name);
         ui->tblProducts->item(m_editingRow, 1)->setText(QString::number(start));
         ui->tblProducts->item(m_editingRow, 2)->setText(QString::number(buyNow));
         ui->tblProducts->item(m_editingRow, 3)->setText(QString::number(duration));
+        ui->tblProducts->item(m_editingRow, 4)->setText(description);
 
         QMessageBox::information(this, "Thành công", "Đã cập nhật thông tin sản phẩm!");
     }
@@ -134,6 +151,11 @@ void CreateRoomDialog::on_btnAddProduct_clicked() {
 void CreateRoomDialog::onVerify() {
     if (ui->txtRoomName->text().isEmpty()) {
         QMessageBox::warning(this, "Lỗi", "Chưa nhập tên Phòng đấu giá!");
+        return;
+    }
+    if (ui->txtRoomName->text().contains('|') || ui->txtRoomName->text().contains('\n') ||
+        ui->txtRoomName->text().contains('\r')) {
+        QMessageBox::warning(this, "Lỗi", "Tên phòng không được chứa ký tự '|'.");
         return;
     }
     if (m_products.empty()) {
@@ -156,6 +178,7 @@ void CreateRoomDialog::on_btnEdit_clicked() {
     // Load dữ liệu từ Vector lên các ô nhập liệu
     ProductInfo p = m_products[row];
     ui->txtName->setText(p.name);
+    ui->txtDescription->setText(p.description);
     ui->spinStartPrice->setValue(p.startPrice);
     ui->spinBuyNow->setValue(p.buyNowPrice);
     ui->spinDuration->setValue(p.duration);
@@ -202,4 +225,44 @@ QString CreateRoomDialog::getStartTimeString() const {
 
 std::vector<ProductInfo> CreateRoomDialog::getProductList() const {
     return m_products;
+}
+
+void CreateRoomDialog::setRoomName(const QString &name) {
+    ui->txtRoomName->setText(name);
+}
+
+void CreateRoomDialog::setStartTimeString(const QString &timeString) {
+    QDateTime dt = QDateTime::fromString(timeString, "yyyy-MM-dd HH:mm:ss");
+    if (dt.isValid()) {
+        ui->dtStartTime->setDateTime(dt);
+    }
+}
+
+void CreateRoomDialog::setProductList(const std::vector<ProductInfo> &products) {
+    m_products = products;
+
+    ui->tblProducts->setRowCount(0);
+    for (const auto &p : m_products) {
+        int row = ui->tblProducts->rowCount();
+        ui->tblProducts->insertRow(row);
+        ui->tblProducts->setItem(row, 0, new QTableWidgetItem(p.name));
+        ui->tblProducts->setItem(row, 1, new QTableWidgetItem(QString::number(p.startPrice)));
+        ui->tblProducts->setItem(row, 2, new QTableWidgetItem(QString::number(p.buyNowPrice)));
+        ui->tblProducts->setItem(row, 3, new QTableWidgetItem(QString::number(p.duration)));
+        ui->tblProducts->setItem(row, 4, new QTableWidgetItem(p.description));
+    }
+
+    // Reset input form (không đụng tới dtStartTime / tên phòng)
+    ui->txtName->clear();
+    ui->txtDescription->clear();
+    ui->spinStartPrice->setValue(0);
+    ui->spinBuyNow->setValue(0);
+    ui->spinDuration->setValue(30);
+    ui->txtName->setFocus();
+
+    m_editingRow = -1;
+    ui->btnAddProduct->setText("Thêm vào danh sách");
+    ui->btnEdit->setEnabled(true);
+    ui->btnDelete->setEnabled(true);
+    ui->tblProducts->setEnabled(true);
 }

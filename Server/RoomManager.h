@@ -8,6 +8,7 @@
 #include <mutex>
 #include <queue>
 #include <string>
+#include <utility>
 #include <vector>
 
 // --- 1. ĐỊNH NGHĨA CALLBACK & SOCKET ---
@@ -46,20 +47,32 @@ public:
 
   // Các hàm nghiệp vụ
   int createRoom(std::string roomName, std::vector<Product> products,
-                 SocketType ownerSocket, int ownerUserId);
+                 SocketType ownerSocket, int ownerUserId,
+                 const std::string &startTime);
   bool joinRoom(int roomId, SocketType clientSocket, std::string &outRoomInfo);
   bool buyNow(int roomId, SocketType buyerSocket, std::string &outMsg,
               BroadcastCallback callback); // Hàm xử lý Bid: Trả về true nếu
                                            // thành công, cập nhật broadcastMsg
   bool placeBid(int roomId, int amount, SocketType bidderSocket,
-                std::string &outBroadcastMsg);
+                std::string &outBroadcastMsg, std::string &outError);
+  bool isRoomStarted(int roomId);
+  bool editRoom(int roomId, SocketType ownerSocket, const std::string &name,
+                const std::vector<Product> &products,
+                const std::string &startTime, std::string &outError);
+  bool stopRoom(int roomId, SocketType ownerSocket,
+                std::string &broadcastMsg, std::string &outError);
+  bool getRoomEditData(int roomId, SocketType ownerSocket, std::string &outName,
+                       std::string &outStartTime,
+                       std::string &outProductsPayload,
+                       std::string &outError);
   bool leaveRoom(int roomId, SocketType clientSocket);
   // Lấy danh sách socket trong phòng để gửi tin
   std::vector<SocketType> getParticipants(int roomId);
+  int getParticipantCount(int roomId);
 
   // Hàm cập nhật thời gian (Được gọi mỗi giây)
   void updateTimers(BroadcastCallback callback);
-  void removeClient(SocketType clientSocket);
+  std::vector<std::pair<int, int>> removeClient(SocketType clientSocket);
 
   // Quản lý User Login
   void loginUser(SocketType sock, int userId, std::string name);
@@ -71,6 +84,7 @@ public:
   void loadState();
 
 private:
+  bool canModifyRoom(const Room &room) const;
   std::map<SocketType, UserSession> userMap;
 };
 

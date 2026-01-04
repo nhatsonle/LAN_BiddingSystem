@@ -1,6 +1,7 @@
 #ifndef ROOM_H
 #define ROOM_H
 
+#include <chrono>
 #include <queue>
 #include <string>
 #include <vector>
@@ -10,6 +11,7 @@ typedef int SocketType;
 struct Product {
   int id; // <-- ID tu Database
   std::string name;
+  std::string description;
   int startPrice;
   int buyNowPrice;
   int duration;
@@ -39,6 +41,10 @@ struct Room {
   int hostUserId;
   int timeLeft;
   int initialDuration;
+  bool hasStartTime = false;
+  std::chrono::system_clock::time_point startTime;
+  std::string startTimeString;
+  bool isWaitingForStart = false;
   // ------------------------------------------------
 
   // ------------------------------------------------
@@ -50,6 +56,12 @@ struct Room {
   // --- THÊM HÀNG CHỜ ---
   std::queue<Product> productQueue; // Hàng đợi các sản phẩm tiếp theo
                                     // ---------------------
+
+  bool hasStarted() const {
+    if (!hasStartTime)
+      return true;
+    return std::chrono::system_clock::now() >= startTime;
+  }
 };
 
 #endif
