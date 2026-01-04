@@ -32,6 +32,9 @@
      <height>23</height>
     </rect>
    </property>
+   <property name="echoMode">
+    <enum>QLineEdit::EchoMode::Password</enum>
+   </property>
   </widget>
   <widget class="QLineEdit" name="txtConfirmPass">
    <property name="geometry">
@@ -41,6 +44,9 @@
      <width>161</width>
      <height>23</height>
     </rect>
+   </property>
+   <property name="echoMode">
+    <enum>QLineEdit::EchoMode::Password</enum>
    </property>
   </widget>
   <widget class="QDialogButtonBox" name="buttonBox">

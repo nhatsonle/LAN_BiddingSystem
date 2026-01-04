@@ -133,7 +133,7 @@
          <string>Xin chào, [Username]</string>
         </property>
        </widget>
-       <widget class="QListWidget" name="listRooms">
+       <widget class="QTableWidget" name="tableRooms">
         <property name="geometry">
          <rect>
           <x>20</x>
@@ -142,6 +142,34 @@
           <height>321</height>
          </rect>
         </property>
+        <property name="selectionBehavior">
+         <enum>QAbstractItemView::SelectRows</enum>
+        </property>
+        <property name="selectionMode">
+         <enum>QAbstractItemView::SingleSelection</enum>
+        </property>
+        <property name="showGrid">
+         <bool>true</bool>
+        </property>
+        <property name="sortingEnabled">
+         <bool>false</bool>
+        </property>
+        <attribute name="horizontalHeaderVisible">
+         <bool>true</bool>
+        </attribute>
+        <attribute name="horizontalHeaderStretchLastSection">
+         <bool>true</bool>
+        </attribute>
+        <column>
+         <property name="text">
+          <string>Phòng</string>
+         </property>
+        </column>
+        <column>
+         <property name="text">
+          <string>Giá</string>
+         </property>
+        </column>
        </widget>
        <widget class="QPushButton" name="btnCreateRoom">
         <property name="geometry">

@@ -57,29 +57,44 @@ void ProfileDialog::onChangePassResult(bool success, const QString &msg) {
 }
 
 void ProfileDialog::updateHistory(const QString &data) {
-  ui->listHistory->clear();
+  ui->tableHistory->setRowCount(0);
   // Format item: Name:Price:Winner;...
   QStringList items = data.split(';', Qt::SkipEmptyParts);
+
+  // Set headers if needed (though UI handles it)
+  // ui->tableHistory->setHorizontalHeaderLabels({"Vật phẩm", "Giá cuối", "Người
+  // thắng"});
+
   for (const QString &item : items) {
     QStringList details = item.split(':');
     if (details.size() >= 3) {
-      QString fmt = QString("Vật phẩm: %1 | Giá cuối: %2 | Người thắng: %3")
-                        .arg(details[0], details[1], details[2]);
-      ui->listHistory->addItem(fmt);
+      int row = ui->tableHistory->rowCount();
+      ui->tableHistory->insertRow(row);
+
+      ui->tableHistory->setItem(row, 0,
+                                new QTableWidgetItem(details[0])); // Name
+      ui->tableHistory->setItem(row, 1,
+                                new QTableWidgetItem(details[1])); // Price
+      ui->tableHistory->setItem(row, 2,
+                                new QTableWidgetItem(details[2])); // Winner
     }
   }
 }
 
 void ProfileDialog::updateWonList(const QString &data) {
-  ui->listWon->clear();
+  ui->tableWon->setRowCount(0);
   // Format: Item:Price:Time;...
   QStringList items = data.split(';', Qt::SkipEmptyParts);
+
   for (const QString &item : items) {
     QStringList details = item.split(':');
     if (details.size() >= 3) {
-      QString fmt = QString("Đã thắng: %1 | Giá: %2 | Thời gian: %3")
-                        .arg(details[0], details[1], details[2]);
-      ui->listWon->addItem(fmt);
+      int row = ui->tableWon->rowCount();
+      ui->tableWon->insertRow(row);
+
+      ui->tableWon->setItem(row, 0, new QTableWidgetItem(details[0])); // Item
+      ui->tableWon->setItem(row, 1, new QTableWidgetItem(details[1])); // Price
+      ui->tableWon->setItem(row, 2, new QTableWidgetItem(details[2])); // Time
     }
   }
 }
