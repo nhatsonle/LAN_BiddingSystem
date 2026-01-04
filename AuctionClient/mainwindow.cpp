@@ -7,7 +7,13 @@
 #include <QDebug>
 #include <QHeaderView>
 #include <QMessageBox>
+#include <QHBoxLayout>
 #include <QTableWidgetItem>
+#include <QLabel>
+#include <QFont>
+#include <QPushButton>
+#include <QTableWidget>
+#include <QVBoxLayout>
 #include <QTimer>
 #include <algorithm>
 
@@ -25,6 +31,77 @@ MainWindow::MainWindow(QWidget *parent)
   ui->tblRoomProducts->setEditTriggers(QAbstractItemView::NoEditTriggers);
   ui->tblRoomProducts->setSelectionBehavior(QAbstractItemView::SelectRows);
   ui->tblRoomProducts->setSelectionMode(QAbstractItemView::SingleSelection);
+
+  m_btnMyRoomsButton = new QPushButton("My Rooms", ui->pageLobby);
+  m_btnMyRoomsButton->setGeometry(260, 480, 101, 31);
+  m_btnMyRoomsButton->setFixedSize(101, 31);
+  connect(m_btnMyRoomsButton, &QPushButton::clicked, this,
+          &MainWindow::showMyRoomsView);
+
+  m_pageMyRooms = new QWidget(this);
+  QVBoxLayout *roomLayout = new QVBoxLayout(m_pageMyRooms);
+  roomLayout->setContentsMargins(20, 20, 20, 20);
+  roomLayout->setSpacing(12);
+  QLabel *roomsTitle = new QLabel("My Rooms", m_pageMyRooms);
+  QFont titleFont = roomsTitle->font();
+  titleFont.setPointSize(14);
+  titleFont.setBold(true);
+  roomsTitle->setFont(titleFont);
+  roomsTitle->setAlignment(Qt::AlignCenter);
+  roomLayout->addWidget(roomsTitle);
+
+  m_tblMyRooms = new QTableWidget(0, 4, m_pageMyRooms);
+  QStringList roomHeaders;
+  roomHeaders << "ID"
+              << "Name"
+              << "Start Time"
+              << "Status";
+  m_tblMyRooms->setHorizontalHeaderLabels(roomHeaders);
+  m_tblMyRooms->horizontalHeader()->setStretchLastSection(true);
+  m_tblMyRooms->setSelectionBehavior(QAbstractItemView::SelectRows);
+  m_tblMyRooms->setSelectionMode(QAbstractItemView::SingleSelection);
+  m_tblMyRooms->setEditTriggers(QAbstractItemView::NoEditTriggers);
+  roomLayout->addWidget(m_tblMyRooms);
+
+  QHBoxLayout *roomButtons = new QHBoxLayout;
+  m_btnReloadMyRooms = new QPushButton("Reload", m_pageMyRooms);
+  m_btnEditMyRoom = new QPushButton("Edit", m_pageMyRooms);
+  m_btnStopMyRoom = new QPushButton("Stop", m_pageMyRooms);
+  m_btnBackToLobby = new QPushButton("Back", m_pageMyRooms);
+  for (auto *btn : {m_btnReloadMyRooms, m_btnEditMyRoom, m_btnStopMyRoom,
+                    m_btnBackToLobby}) {
+    btn->setFixedSize(101, 31);
+  }
+  roomButtons->addWidget(m_btnReloadMyRooms);
+  roomButtons->addWidget(m_btnEditMyRoom);
+  roomButtons->addWidget(m_btnStopMyRoom);
+  roomButtons->addStretch();
+  roomButtons->addWidget(m_btnBackToLobby);
+  roomLayout->addLayout(roomButtons);
+  roomLayout->addStretch();
+
+  m_btnEditMyRoom->setEnabled(false);
+  m_btnStopMyRoom->setEnabled(false);
+
+  ui->stackedWidget->insertWidget(2, m_pageMyRooms);
+
+  m_myRoomsGateTimer = new QTimer(this);
+  m_myRoomsGateTimer->setInterval(1000);
+  connect(m_myRoomsGateTimer, &QTimer::timeout, this,
+          &MainWindow::myRoomsSelectionChanged);
+
+  connect(m_tblMyRooms, &QTableWidget::itemSelectionChanged, this,
+          &MainWindow::myRoomsSelectionChanged);
+  connect(m_btnReloadMyRooms, &QPushButton::clicked, this,
+          &MainWindow::reloadMyRooms);
+  connect(m_btnEditMyRoom, &QPushButton::clicked, this,
+          &MainWindow::editSelectedRoom);
+  connect(m_btnStopMyRoom, &QPushButton::clicked, this,
+          &MainWindow::stopSelectedRoom);
+  connect(m_btnBackToLobby, &QPushButton::clicked, this,
+          &MainWindow::backToLobbyFromMyRooms);
+
+  m_myRoomsServerEpoch = 0;
 
   // Khởi tạo Socket
   m_socket = new QTcpSocket(this);
@@ -543,6 +620,88 @@ void MainWindow::onReadyRead() {
       // Tự động refresh lại list để thấy phòng mình vừa tạo
       on_btnRefresh_clicked();
     }
+    else if (line.startsWith("OK|MY_ROOMS")) {
+      QStringList parts = line.split('|');
+      if (parts.size() >= 3) {
+        bool okEpoch = false;
+        qint64 epoch = parts[2].toLongLong(&okEpoch);
+        if (okEpoch) {
+          m_myRoomsServerEpoch = epoch;
+          m_myRoomsElapsed.restart();
+        } else {
+          m_myRoomsServerEpoch = 0;
+          m_myRoomsElapsed.invalidate();
+        }
+      }
+      QString payload = line.section('|', 3);
+      populateMyRoomsTable(payload);
+    }
+    else if (line.startsWith("OK|ROOM_EDIT_DATA")) {
+      // OK|ROOM_EDIT_DATA|server_epoch|roomId|roomName|startTime|productsPayload
+      QStringList parts = line.split('|');
+      if (parts.size() < 7)
+        continue;
+
+      bool okEpoch = false;
+      qint64 epoch = parts[2].toLongLong(&okEpoch);
+      if (okEpoch) {
+        m_myRoomsServerEpoch = epoch;
+        m_myRoomsElapsed.restart();
+      }
+
+      int roomId = parts[3].toInt();
+      QString roomName = parts[4];
+      QString startTime = parts[5];
+      QString productsPayload = line.section('|', 6);
+
+      std::vector<ProductInfo> products;
+      QStringList entries = productsPayload.split(';', Qt::SkipEmptyParts);
+      products.reserve(entries.size());
+      for (const QString &entry : entries) {
+        QStringList fields = entry.split(',');
+        if (fields.size() < 5)
+          continue;
+        ProductInfo p;
+        p.name = fields[0];
+        p.startPrice = fields[1].toInt();
+        p.buyNowPrice = fields[2].toInt();
+        p.duration = fields[3].toInt();
+        p.description = fields[4];
+        products.push_back(p);
+      }
+
+      CreateRoomDialog dlg(this);
+      dlg.setRoomName(roomName);
+      dlg.setStartTimeString(startTime);
+      dlg.setProductList(products);
+      if (dlg.exec() != QDialog::Accepted)
+        continue;
+
+      std::vector<ProductInfo> newProducts = dlg.getProductList();
+      if (newProducts.empty()) {
+        QMessageBox::warning(this, "Missing products",
+                             "Please add at least one product.");
+        continue;
+      }
+
+      QString payload = buildProductPayload(newProducts);
+      QString cmd = QString("EDIT_ROOM|%1|%2|%3|%4\n")
+                        .arg(roomId)
+                        .arg(dlg.getRoomName())
+                        .arg(payload)
+                        .arg(dlg.getStartTimeString());
+      sendRequest(cmd);
+    }
+    else if (line.startsWith("OK|ROOM_UPDATED")) {
+      QMessageBox::information(this, "Room Updated",
+                               "Room details were updated successfully.");
+      requestMyRooms();
+    }
+    else if (line.startsWith("OK|ROOM_STOPPED")) {
+      QMessageBox::information(this, "Room Stopped",
+                               "Room has been stopped by the host.");
+      requestMyRooms();
+    }
     // 1. XỬ LÝ VÀO PHÒNG THÀNH CÔNG
     // Server: OK|JOINED|<id>|<name>|<price>
 	    else if (line.startsWith("OK|JOINED")) {
@@ -574,6 +733,20 @@ void MainWindow::onReadyRead() {
 
         QString startTime = (parts.size() >= 11) ? parts[10] : QString();
         bool startedFlag = parts.size() >= 12 ? parts[11].toInt() != 0 : true;
+        if (parts.size() >= 13) {
+          bool okEpoch = false;
+          qint64 epoch = parts[12].toLongLong(&okEpoch);
+          if (okEpoch) {
+            m_roomServerEpoch = epoch;
+            m_roomServerElapsed.restart();
+          } else {
+            m_roomServerEpoch = 0;
+            m_roomServerElapsed.invalidate();
+          }
+        } else {
+          m_roomServerEpoch = 0;
+          m_roomServerElapsed.invalidate();
+        }
         m_roomHasStartTime = false;
         m_roomStartReached = true;
         m_roomStartTime = QDateTime();
@@ -598,61 +771,71 @@ void MainWindow::onReadyRead() {
         ui->tblRoomProducts->setRowCount(0);
         sendRequest(QString("GET_PRODUCTS|%1\n").arg(m_currentRoomId));
 
-	        ui->stackedWidget->setCurrentIndex(2);
+        ui->stackedWidget->setCurrentIndex(3);
 	      }
 	    }
 
 	    else if (line.startsWith("OK|PRODUCT_LIST")) {
 	      int roomId = line.section('|', 2, 2).toInt();
+	      QString data = line.section('|', 3);
 	      if (roomId != m_currentRoomId)
 	        continue;
 
-	      QString data = line.section('|', 3);
-	      ui->tblRoomProducts->setRowCount(0);
+	      // Case 1: product list của room đang ở màn hình phòng đấu giá
+	      if (roomId == m_currentRoomId) {
+	        ui->tblRoomProducts->setRowCount(0);
 
-	      QStringList entries = data.split(';', Qt::SkipEmptyParts);
-	      for (const QString &entry : entries) {
-	        QStringList fields = entry.split(',');
-	        if (fields.size() < 4)
-	          continue;
+	        QStringList entries = data.split(';', Qt::SkipEmptyParts);
+	        for (const QString &entry : entries) {
+	          QStringList fields = entry.split(',');
+	          if (fields.size() < 7)
+	            continue;
 
-	        int productId = fields[0].toInt();
-	        QString status = fields[1].trimmed();
-	        QString name = fields[2];
-	        QString description = fields[3];
+	          int productId = fields[0].toInt();
+	          QString status = fields[1].trimmed();
+	          QString name = fields[2];
+	          int startPrice = fields[3].toInt();
+	          int buyNowPrice = fields[4].toInt();
+	          int duration = fields[5].toInt();
+	          QString description = fields[6];
 
-	        int row = ui->tblRoomProducts->rowCount();
-	        ui->tblRoomProducts->insertRow(row);
+	          int row = ui->tblRoomProducts->rowCount();
+	          ui->tblRoomProducts->insertRow(row);
 
-	        auto *nameItem = new QTableWidgetItem(name);
-	        nameItem->setData(Qt::UserRole, productId);
-	        nameItem->setData(Qt::UserRole + 1, status);
-	        nameItem->setData(Qt::UserRole + 2, description);
+	          auto *nameItem = new QTableWidgetItem(name);
+	          nameItem->setData(Qt::UserRole, productId);
+	          nameItem->setData(Qt::UserRole + 1, status);
+	          nameItem->setData(Qt::UserRole + 2, description);
+	          nameItem->setData(Qt::UserRole + 3, startPrice);
+	          nameItem->setData(Qt::UserRole + 4, buyNowPrice);
+	          nameItem->setData(Qt::UserRole + 5, duration);
 
-	        auto *statusItem = new QTableWidgetItem(statusToText(status));
-	        statusItem->setData(Qt::UserRole, productId);
-	        statusItem->setData(Qt::UserRole + 1, status);
+	          auto *statusItem = new QTableWidgetItem(statusToText(status));
+	          statusItem->setData(Qt::UserRole, productId);
+	          statusItem->setData(Qt::UserRole + 1, status);
 
-	        ui->tblRoomProducts->setItem(row, 0, nameItem);
-	        ui->tblRoomProducts->setItem(row, 1, statusItem);
-	      }
-	      refreshProductTableStyles();
+	          ui->tblRoomProducts->setItem(row, 0, nameItem);
+	          ui->tblRoomProducts->setItem(row, 1, statusItem);
+	        }
+	        refreshProductTableStyles();
 
-	      // Cache active product description for the top button
-	      m_activeProductId = -1;
-	      m_activeProductDescription.clear();
-	      for (int row = 0; row < ui->tblRoomProducts->rowCount(); ++row) {
-	        QTableWidgetItem *nameItem = ui->tblRoomProducts->item(row, 0);
-	        if (!nameItem)
-	          continue;
-	        QString status = nameItem->data(Qt::UserRole + 1).toString();
-	        if (status == "ACTIVE") {
-	          m_activeProductId = nameItem->data(Qt::UserRole).toInt();
-	          m_activeProductDescription =
-	              nameItem->data(Qt::UserRole + 2).toString();
-	          break;
+	        // Cache active product description for the top button
+	        m_activeProductId = -1;
+	        m_activeProductDescription.clear();
+	        for (int row = 0; row < ui->tblRoomProducts->rowCount(); ++row) {
+	          QTableWidgetItem *nameItem = ui->tblRoomProducts->item(row, 0);
+	          if (!nameItem)
+	            continue;
+	          QString status = nameItem->data(Qt::UserRole + 1).toString();
+	          if (status == "ACTIVE") {
+	            m_activeProductId = nameItem->data(Qt::UserRole).toInt();
+	            m_activeProductDescription =
+	                nameItem->data(Qt::UserRole + 2).toString();
+	            break;
+	          }
 	        }
 	      }
+
 	    }
 
 	    // 2. XỬ LÝ KHI CÓ NGƯỜI RA GIÁ (BROADCAST)
@@ -745,6 +928,12 @@ void MainWindow::onReadyRead() {
           }
           m_roomStartReached = true;
           updateRoomStartState(true);
+        } else if (roomId == m_currentRoomId && status == "STOPPED") {
+          ui->txtRoomLog->append(
+              "<span style=\"color:#e74c3c;\">Room has been stopped.</span>");
+          m_roomHasStartTime = false;
+          m_roomStartReached = true;
+          updateRoomActionPermissions();
         }
       }
     } else if (line.startsWith("CHAT")) {
@@ -871,6 +1060,17 @@ void MainWindow::onReadyRead() {
       QMessageBox::critical(
           this, "Đăng ký thất bại",
           "Tên đăng nhập này đã tồn tại.\nVui lòng chọn tên khác.");
+    }
+    else if (line.startsWith("ERR|") &&
+             !line.startsWith("ERR|WRONG_PASS") &&
+             !line.startsWith("ERR|INVALID_PRICE_CONFIG") &&
+             !line.startsWith("ERR|PRICE_TOO_LOW") &&
+             !line.startsWith("ERR|ROOM_NOT_STARTED") &&
+             !line.startsWith("ERR|LOGIN_FAILED") &&
+             !line.startsWith("ERR|ALREADY_LOGGED_IN") &&
+             !line.startsWith("ERR|USER_EXISTS")) {
+      QString err = line.section('|', 1, 1);
+      QMessageBox::warning(this, "Server Error", err);
     }
     // ...
 	    else if (line.startsWith("NEXT_ITEM")) {
@@ -1005,6 +1205,8 @@ void MainWindow::resetRoomStartState() {
   m_roomStartTime = QDateTime();
   m_roomHasStartTime = false;
   m_roomStartReached = true;
+  m_roomServerEpoch = 0;
+  m_roomServerElapsed.invalidate();
 }
 
 void MainWindow::updateRoomStartState(bool force) {
@@ -1017,6 +1219,10 @@ void MainWindow::updateRoomStartState(bool force) {
   }
 
   QDateTime now = QDateTime::currentDateTime();
+  if (m_roomServerEpoch > 0 && m_roomServerElapsed.isValid()) {
+    qint64 nowEpoch = m_roomServerEpoch + (m_roomServerElapsed.elapsed() / 1000);
+    now = QDateTime::fromSecsSinceEpoch(nowEpoch);
+  }
   bool reached = now >= m_roomStartTime;
   if (force || reached != m_roomStartReached) {
     m_roomStartReached = reached;
@@ -1076,4 +1282,174 @@ void MainWindow::sendRequest(const QString &cmd) {
   } else {
     QMessageBox::warning(this, "Lỗi", "Chưa kết nối Server.");
   }
+}
+
+void MainWindow::showMyRoomsView() {
+  ui->stackedWidget->setCurrentIndex(2);
+  requestMyRooms();
+  if (m_myRoomsGateTimer && !m_myRoomsGateTimer->isActive())
+    m_myRoomsGateTimer->start();
+}
+
+void MainWindow::reloadMyRooms() { requestMyRooms(); }
+
+void MainWindow::backToLobbyFromMyRooms() {
+  ui->stackedWidget->setCurrentIndex(1);
+  if (m_myRoomsGateTimer && m_myRoomsGateTimer->isActive())
+    m_myRoomsGateTimer->stop();
+}
+
+void MainWindow::myRoomsSelectionChanged() {
+  bool hasSelection = !m_tblMyRooms->selectedItems().isEmpty();
+  if (!hasSelection) {
+    m_btnEditMyRoom->setEnabled(false);
+    m_btnStopMyRoom->setEnabled(false);
+    return;
+  }
+  int row = m_tblMyRooms->currentRow();
+  if (row < 0) {
+    m_btnEditMyRoom->setEnabled(false);
+    m_btnStopMyRoom->setEnabled(false);
+    return;
+  }
+  m_btnEditMyRoom->setEnabled(canEditMyRoomRow(row));
+  m_btnStopMyRoom->setEnabled(canStopMyRoomRow(row));
+}
+
+void MainWindow::editSelectedRoom() {
+  if (m_tblMyRooms->selectedItems().isEmpty())
+    return;
+  int row = m_tblMyRooms->currentRow();
+  if (row < 0)
+    return;
+  int roomId = m_tblMyRooms->item(row, 0)->text().toInt();
+
+  QString reason;
+  if (!canEditMyRoomRow(row, &reason)) {
+    QMessageBox::warning(this, "Edit Not Allowed",
+                         reason.isEmpty() ? "Không đủ điều kiện chỉnh sửa."
+                                          : reason);
+    return;
+  }
+  // Lấy đầy đủ dữ liệu edit từ server (roomName + startTime + product list)
+  sendRequest(QString("GET_ROOM_EDIT_DATA|%1\n").arg(roomId));
+}
+
+void MainWindow::stopSelectedRoom() {
+  if (m_tblMyRooms->selectedItems().isEmpty())
+    return;
+  int row = m_tblMyRooms->currentRow();
+  if (row < 0)
+    return;
+  if (!canStopMyRoomRow(row)) {
+    QMessageBox::warning(this, "Stop Not Allowed",
+                         "Chỉ dừng được khi phòng đang OPEN.");
+    return;
+  }
+  int roomId = m_tblMyRooms->item(row, 0)->text().toInt();
+  sendRequest(QString("STOP_ROOM|%1\n").arg(roomId));
+}
+
+void MainWindow::requestMyRooms() {
+  if (m_socket->state() != QAbstractSocket::ConnectedState) {
+    QMessageBox::warning(this, "Lỗi", "Chưa kết nối Server.");
+    return;
+  }
+  m_tblMyRooms->setRowCount(0);
+  m_btnEditMyRoom->setEnabled(false);
+  m_btnStopMyRoom->setEnabled(false);
+  sendRequest("MY_ROOMS\n");
+}
+
+void MainWindow::populateMyRoomsTable(const QString &payload) {
+  m_tblMyRooms->setRowCount(0);
+  QStringList entries = payload.split(';', Qt::SkipEmptyParts);
+  for (const QString &entry : entries) {
+    QStringList fields = entry.split(',');
+    if (fields.size() < 4)
+      continue;
+
+    int row = m_tblMyRooms->rowCount();
+    m_tblMyRooms->insertRow(row);
+
+    auto *idItem = new QTableWidgetItem(fields[0]);
+    idItem->setData(Qt::UserRole, fields[0].toInt());
+    m_tblMyRooms->setItem(row, 0, idItem);
+    m_tblMyRooms->setItem(row, 1, new QTableWidgetItem(fields[1]));
+
+    QString startTime = fields[2].isEmpty() ? "-" : fields[2];
+    auto *startItem = new QTableWidgetItem(startTime);
+    startItem->setData(Qt::UserRole, fields[2]);
+    m_tblMyRooms->setItem(row, 2, startItem);
+
+    auto *statusItem = new QTableWidgetItem(fields[3]);
+    m_tblMyRooms->setItem(row, 3, statusItem);
+  }
+  myRoomsSelectionChanged();
+}
+
+QString MainWindow::buildProductPayload(const std::vector<ProductInfo> &products) const {
+  QStringList parts;
+  for (const auto &p : products) {
+    parts.append(QString("%1,%2,%3,%4,%5")
+                     .arg(p.name)
+                     .arg(p.startPrice)
+                     .arg(p.buyNowPrice)
+                     .arg(p.duration)
+                     .arg(p.description));
+  }
+  return parts.join(';');
+}
+
+qint64 MainWindow::myRoomsNowEpoch() const {
+  if (m_myRoomsServerEpoch > 0 && m_myRoomsElapsed.isValid()) {
+    return m_myRoomsServerEpoch + (m_myRoomsElapsed.elapsed() / 1000);
+  }
+  return QDateTime::currentDateTime().toSecsSinceEpoch();
+}
+
+bool MainWindow::canStopMyRoomRow(int row) const {
+  if (!m_tblMyRooms || row < 0 || row >= m_tblMyRooms->rowCount())
+    return false;
+  QTableWidgetItem *statusItem = m_tblMyRooms->item(row, 3);
+  if (!statusItem)
+    return false;
+  return statusItem->text().trimmed() == "OPEN";
+}
+
+bool MainWindow::canEditMyRoomRow(int row, QString *outReason) const {
+  if (outReason)
+    outReason->clear();
+  if (!canStopMyRoomRow(row)) {
+    if (outReason)
+      *outReason = "Chỉ chỉnh sửa được khi phòng đang OPEN.";
+    return false;
+  }
+
+  QString rawStartTime;
+  if (QTableWidgetItem *startItem = m_tblMyRooms->item(row, 2))
+    rawStartTime = startItem->data(Qt::UserRole).toString().trimmed();
+
+  if (rawStartTime.isEmpty()) {
+    if (outReason)
+      *outReason = "Phòng cần có start time để chỉnh sửa.";
+    return false;
+  }
+
+  QDateTime start = QDateTime::fromString(rawStartTime, "yyyy-MM-dd HH:mm:ss");
+  if (!start.isValid()) {
+    if (outReason)
+      *outReason = "Start time không hợp lệ.";
+    return false;
+  }
+
+  const qint64 secondsRemaining = start.toSecsSinceEpoch() - myRoomsNowEpoch();
+  if (secondsRemaining < 5 * 60) {
+    if (outReason)
+      *outReason =
+          "Bạn chỉ được chỉnh sửa khi còn ít nhất 5 phút trước start time.";
+    return false;
+  }
+
+  return true;
 }

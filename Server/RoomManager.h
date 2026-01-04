@@ -56,6 +56,15 @@ public:
   bool placeBid(int roomId, int amount, SocketType bidderSocket,
                 std::string &outBroadcastMsg, std::string &outError);
   bool isRoomStarted(int roomId);
+  bool editRoom(int roomId, SocketType ownerSocket, const std::string &name,
+                const std::vector<Product> &products,
+                const std::string &startTime, std::string &outError);
+  bool stopRoom(int roomId, SocketType ownerSocket,
+                std::string &broadcastMsg, std::string &outError);
+  bool getRoomEditData(int roomId, SocketType ownerSocket, std::string &outName,
+                       std::string &outStartTime,
+                       std::string &outProductsPayload,
+                       std::string &outError);
   bool leaveRoom(int roomId, SocketType clientSocket);
   // Lấy danh sách socket trong phòng để gửi tin
   std::vector<SocketType> getParticipants(int roomId);
@@ -75,6 +84,7 @@ public:
   void loadState();
 
 private:
+  bool canModifyRoom(const Room &room) const;
   std::map<SocketType, UserSession> userMap;
 };
 

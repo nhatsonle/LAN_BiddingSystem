@@ -51,7 +51,7 @@ CreateRoomDialog::CreateRoomDialog(QWidget *parent) :
     connect(ui->buttonBox, &QDialogButtonBox::accepted, this, &CreateRoomDialog::onVerify);
     connect(ui->buttonBox, &QDialogButtonBox::rejected, this, &QDialog::reject);
 
-    ui->dtStartTime->setDateTime(QDateTime::currentDateTime());
+    // Không reset start time khi thao tác sản phẩm (start time thuộc về phòng).
 }
 
 CreateRoomDialog::~CreateRoomDialog()
@@ -65,7 +65,7 @@ void CreateRoomDialog::resetInputForm() {
     ui->spinStartPrice->setValue(0);
     ui->spinBuyNow->setValue(0);
     ui->spinDuration->setValue(30); // Giá trị mặc định
-    ui->dtStartTime->setDateTime(QDateTime::currentDateTime());
+    // start time giu nguyen khi thao tac san pham
     ui->txtName->setFocus();
 
     // Reset trạng thái về "Thêm mới"
@@ -225,4 +225,44 @@ QString CreateRoomDialog::getStartTimeString() const {
 
 std::vector<ProductInfo> CreateRoomDialog::getProductList() const {
     return m_products;
+}
+
+void CreateRoomDialog::setRoomName(const QString &name) {
+    ui->txtRoomName->setText(name);
+}
+
+void CreateRoomDialog::setStartTimeString(const QString &timeString) {
+    QDateTime dt = QDateTime::fromString(timeString, "yyyy-MM-dd HH:mm:ss");
+    if (dt.isValid()) {
+        ui->dtStartTime->setDateTime(dt);
+    }
+}
+
+void CreateRoomDialog::setProductList(const std::vector<ProductInfo> &products) {
+    m_products = products;
+
+    ui->tblProducts->setRowCount(0);
+    for (const auto &p : m_products) {
+        int row = ui->tblProducts->rowCount();
+        ui->tblProducts->insertRow(row);
+        ui->tblProducts->setItem(row, 0, new QTableWidgetItem(p.name));
+        ui->tblProducts->setItem(row, 1, new QTableWidgetItem(QString::number(p.startPrice)));
+        ui->tblProducts->setItem(row, 2, new QTableWidgetItem(QString::number(p.buyNowPrice)));
+        ui->tblProducts->setItem(row, 3, new QTableWidgetItem(QString::number(p.duration)));
+        ui->tblProducts->setItem(row, 4, new QTableWidgetItem(p.description));
+    }
+
+    // Reset input form (không đụng tới dtStartTime / tên phòng)
+    ui->txtName->clear();
+    ui->txtDescription->clear();
+    ui->spinStartPrice->setValue(0);
+    ui->spinBuyNow->setValue(0);
+    ui->spinDuration->setValue(30);
+    ui->txtName->setFocus();
+
+    m_editingRow = -1;
+    ui->btnAddProduct->setText("Thêm vào danh sách");
+    ui->btnEdit->setEnabled(true);
+    ui->btnDelete->setEnabled(true);
+    ui->tblProducts->setEnabled(true);
 }

@@ -45,9 +45,18 @@ public:
   void updateProductStatus(int productId, const std::string &status);
   void addRoomMember(int roomId, int userId,
                      const std::string &role = "BIDDER");
+  void updateRoomName(int roomId, const std::string &name);
+
+  std::string getMyRooms(int userId);
+  void deleteProductsForRoom(int roomId);
+  void updateRoomStartTime(int roomId, const std::string &startTime);
 
   // Product list for UI
   std::string getProductList(int roomId);
+
+  bool getRoomMeta(int roomId, int &outCreatedByUserId, std::string &outName,
+                   std::string &outStartTime, std::string &outStatus);
+  std::string getProductPayloadForEdit(int roomId);
 
   // Recovery
   std::vector<Room> loadOpenRooms();

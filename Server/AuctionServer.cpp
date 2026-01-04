@@ -2,6 +2,7 @@
 #include "DatabaseManager.h"
 #include <algorithm>
 #include <chrono>
+#include <ctime>
 #include <cerrno>
 #include <cstring>
 #include <iostream>
@@ -62,6 +63,37 @@ std::vector<std::string> split(const std::string &s, char delimiter) {
     tokens.push_back(token);
   }
   return tokens;
+}
+
+static std::vector<Product> parseProductPayload(const std::string &payload) {
+  std::vector<Product> productList;
+  auto items = split(payload, ';');
+  for (const auto &item : items) {
+    if (item.empty())
+      continue;
+    auto details = split(item, ',');
+    if (details.size() < 4)
+      continue;
+    Product p;
+    p.name = details[0];
+    if (p.name.empty())
+      continue;
+    p.description = (details.size() >= 5) ? sanitizeDescription(details[4]) : "";
+    try {
+      int startPrice = std::stoi(details[1]);
+      int buyNowPrice = std::stoi(details[2]);
+      int duration = std::stoi(details[3]);
+      if (startPrice < 0 || buyNowPrice <= startPrice || duration <= 0)
+        continue;
+      p.startPrice = startPrice;
+      p.buyNowPrice = buyNowPrice;
+      p.duration = std::min(duration, 1800);
+    } catch (...) {
+      continue;
+    }
+    productList.push_back(p);
+  }
+  return productList;
 }
 
 void AuctionServer::start() {
@@ -161,52 +193,40 @@ std::string AuctionServer::processCommand(SocketType clientSocket,
       return "ERR|MISSING_ARGS";
 
     std::string roomName = tokens[1];
-    std::string allProductsStr = tokens[2]; // Chuỗi dài chứa tất cả SP
+    std::string allProductsStr = tokens[2];
     std::string startTime = tokens.size() >= 4 ? tokens[3] : "";
 
-    std::vector<Product> productList;
-
-    // 1. Tách các sản phẩm bằng dấu chấm phẩy ';'
-    std::vector<std::string> items = split(allProductsStr, ';');
-
-	    for (const std::string &itemStr : items) {
-	      // 2. Tách chi tiết từng sản phẩm bằng dấu phẩy ','
-	      // Format: Name,Start,BuyNow,Duration[,Description]
-	      std::vector<std::string> details = split(itemStr, ',');
-
-	      if (details.size() >= 4) {
-	        Product p;
-	        p.name = details[0];
-	        p.description =
-	            (details.size() >= 5) ? sanitizeDescription(details[4]) : "";
-	        try {
-	          p.startPrice = std::stoi(details[1]);
-	          p.buyNowPrice = std::stoi(details[2]);
-	          p.duration = std::stoi(details[3]);
-	          p.duration = std::min(p.duration, 1800); // giới hạn 30 phút
-
-          // Logic validate cơ bản
-          if (p.buyNowPrice > p.startPrice) {
-            productList.push_back(p);
-          }
-        } catch (...) {
-          continue; // Bỏ qua nếu lỗi format số
-        }
-      }
-    }
-
+    std::vector<Product> productList = parseProductPayload(allProductsStr);
     if (productList.empty())
       return "ERR|NO_VALID_PRODUCTS";
 
     int ownerUserId = RoomManager::getInstance().getUserId(clientSocket);
-    if (ownerUserId <= 0) {
+    if (ownerUserId <= 0)
       return "ERR|NOT_LOGIN";
-    }
 
-    // Gọi Manager tạo phòng, gắn quyền chủ phòng
     int newId = RoomManager::getInstance().createRoom(
         roomName, productList, clientSocket, ownerUserId, startTime);
+    if (newId == -1)
+      return "ERR|CREATE_FAILED";
     return "OK|ROOM_CREATED|" + std::to_string(newId);
+  } else if (cmd == "EDIT_ROOM") {
+    if (tokens.size() < 4)
+      return "ERR|MISSING_ARGS";
+    int roomId = std::stoi(tokens[1]);
+    std::string roomName = tokens[2];
+    std::string productPayload = tokens[3];
+    std::string startTime = tokens.size() >= 5 ? tokens[4] : "";
+
+    std::vector<Product> productList = parseProductPayload(productPayload);
+    if (productList.empty())
+      return "ERR|NO_VALID_PRODUCTS";
+
+    std::string error;
+    if (RoomManager::getInstance().editRoom(roomId, clientSocket, roomName,
+                                            productList, startTime, error)) {
+      return "OK|ROOM_UPDATED";
+    }
+    return error.empty() ? "ERR|EDIT_FAILED" : error;
   } else if (cmd == "BUY_NOW") {
     if (tokens.size() < 2)
       return "ERR|MISSING_ARGS";
@@ -230,9 +250,47 @@ std::string AuctionServer::processCommand(SocketType clientSocket,
     } else {
       return "ERR|BUY_FAILED";
     }
+  } else if (cmd == "MY_ROOMS") {
+    int userId = RoomManager::getInstance().getUserId(clientSocket);
+    if (userId <= 0)
+      return "ERR|NOT_LOGGED_IN";
+    std::string list = DatabaseManager::getInstance().getMyRooms(userId);
+    auto now = std::chrono::system_clock::now();
+    std::time_t nowT = std::chrono::system_clock::to_time_t(now);
+    return "OK|MY_ROOMS|" + std::to_string((long long)nowT) + "|" + list;
   } else if (cmd == "LIST_ROOMS") {
     std::string list = RoomManager::getInstance().getRoomList();
     return "OK|LIST|" + list;
+  } else if (cmd == "STOP_ROOM") {
+    if (tokens.size() < 2)
+      return "ERR|MISSING_ARGS";
+    int roomId = std::stoi(tokens[1]);
+    std::string broadcast;
+    std::string error;
+    if (RoomManager::getInstance().stopRoom(roomId, clientSocket, broadcast,
+                                            error)) {
+      if (!broadcast.empty())
+        broadcastToRoom(roomId, broadcast);
+      return "OK|ROOM_STOPPED";
+    }
+    return error.empty() ? "ERR|STOP_FAILED" : error;
+  } else if (cmd == "GET_ROOM_EDIT_DATA") { // GET_ROOM_EDIT_DATA|RoomID
+    if (tokens.size() < 2)
+      return "ERR|MISSING_ARGS";
+    int roomId = std::stoi(tokens[1]);
+    std::string name;
+    std::string startTime;
+    std::string products;
+    std::string error;
+    if (!RoomManager::getInstance().getRoomEditData(
+            roomId, clientSocket, name, startTime, products, error)) {
+      return error.empty() ? "ERR|EDIT_DATA_FAILED" : error;
+    }
+    auto now = std::chrono::system_clock::now();
+    std::time_t nowT = std::chrono::system_clock::to_time_t(now);
+    return "OK|ROOM_EDIT_DATA|" + std::to_string((long long)nowT) + "|" +
+           std::to_string(roomId) + "|" + name + "|" + startTime + "|" +
+           products;
   } else if (cmd == "JOIN_ROOM") { // JOIN_ROOM|ID
     if (tokens.size() < 2)
       return "ERR|MISSING_ARGS";
@@ -252,7 +310,9 @@ std::string AuctionServer::processCommand(SocketType clientSocket,
           "\n";
       broadcastToRoom(roomId, countMsg);
       // Response chỉ gồm 1 dòng OK|JOINED (chat join được gửi qua broadcast)
-      return "OK|JOINED|" + info;
+      auto now = std::chrono::system_clock::now();
+      std::time_t nowT = std::chrono::system_clock::to_time_t(now);
+      return "OK|JOINED|" + info + "|" + std::to_string((long long)nowT);
     }
     return "ERR|ROOM_NOT_FOUND";
   } else if (cmd == "BID") { // BID|ID|Amount

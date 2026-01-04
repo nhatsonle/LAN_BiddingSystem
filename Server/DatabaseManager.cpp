@@ -99,14 +99,14 @@ bool DatabaseManager::init(const std::string &dbName) {
 
   // 3. Tạo bảng Rooms
   const char *sqlRooms = "CREATE TABLE IF NOT EXISTS rooms ("
-                         "id INTEGER PRIMARY KEY AUTOINCREMENT,"
-                         "name TEXT NOT NULL,"
-                         "status TEXT DEFAULT 'OPEN',"
-                         "created_by INTEGER,"
-                         "start_time DATETIME DEFAULT CURRENT_TIMESTAMP,"
-                         "created_at DATETIME DEFAULT CURRENT_TIMESTAMP,"
-                         "closed_at DATETIME,"
-                         "FOREIGN KEY(created_by) REFERENCES users(id));";
+                        "id INTEGER PRIMARY KEY AUTOINCREMENT,"
+                        "name TEXT NOT NULL,"
+                        "status TEXT DEFAULT 'OPEN',"
+                        "created_by INTEGER,"
+                        "start_time DATETIME DEFAULT CURRENT_TIMESTAMP,"
+                        "created_at DATETIME DEFAULT CURRENT_TIMESTAMP,"
+                        "closed_at DATETIME,"
+                        "FOREIGN KEY(created_by) REFERENCES users(id));";
   rc = sqlite3_exec(db, sqlRooms, 0, 0, &zErrMsg);
   if (rc != SQLITE_OK) {
     std::cerr << "SQL error (Create Rooms): " << zErrMsg << std::endl;
@@ -430,6 +430,16 @@ void DatabaseManager::updateProductStatus(int productId,
     sqlite3_free(zErrMsg);
 }
 
+void DatabaseManager::updateRoomName(int roomId, const std::string &name) {
+  std::string safeName = escapeSqlString(name);
+  std::string sql = "UPDATE rooms SET name='" + safeName +
+                    "' WHERE id=" + std::to_string(roomId) + ";";
+  char *zErrMsg = 0;
+  sqlite3_exec(db, sql.c_str(), 0, 0, &zErrMsg);
+  if (zErrMsg)
+    sqlite3_free(zErrMsg);
+}
+
 void DatabaseManager::addRoomMember(int roomId, int userId,
                                     const std::string &role) {
   std::string sql = "INSERT OR REPLACE INTO room_members (room_id, user_id, "
@@ -446,7 +456,8 @@ std::string DatabaseManager::getProductList(int roomId) {
   // Format: productId,status,name,description;productId,status,name,description;...
   std::string list;
   std::string sql =
-      "SELECT id, status, name, description FROM products WHERE room_id=" +
+      "SELECT id, status, name, start_price, buy_now_price, duration, description "
+      "FROM products WHERE room_id=" +
       std::to_string(roomId) + " ORDER BY id ASC;";
 
   auto cb = [](void *data, int argc, char **argv, char **col) -> int {
@@ -454,10 +465,14 @@ std::string DatabaseManager::getProductList(int roomId) {
     std::string id = (argc > 0 && argv[0]) ? argv[0] : "0";
     std::string status = (argc > 1 && argv[1]) ? argv[1] : "WAITING";
     std::string name = (argc > 2 && argv[2]) ? argv[2] : "";
-    std::string desc = (argc > 3 && argv[3]) ? argv[3] : "";
+    std::string start = (argc > 3 && argv[3]) ? argv[3] : "0";
+    std::string buyNow = (argc > 4 && argv[4]) ? argv[4] : "0";
+    std::string duration = (argc > 5 && argv[5]) ? argv[5] : "0";
+    std::string desc = (argc > 6 && argv[6]) ? argv[6] : "";
     name = sanitizeProtocolField(name);
     desc = sanitizeProtocolField(desc);
-    *res += id + "," + status + "," + name + "," + desc + ";";
+    *res += id + "," + status + "," + name + "," + start + "," + buyNow + "," +
+            duration + "," + desc + ";";
     return 0;
   };
 
@@ -466,6 +481,129 @@ std::string DatabaseManager::getProductList(int roomId) {
   if (zErrMsg)
     sqlite3_free(zErrMsg);
   return list;
+}
+
+std::string DatabaseManager::getMyRooms(int userId) {
+  std::string list;
+  std::string sql = "SELECT id, name, start_time, status FROM rooms "
+                    "WHERE created_by=" +
+                    std::to_string(userId) + " ORDER BY id DESC;";
+  auto cb = [](void *data, int argc, char **argv, char **col) -> int {
+    auto *res = static_cast<std::string *>(data);
+    std::string id = (argc > 0 && argv[0]) ? argv[0] : "0";
+    std::string name = (argc > 1 && argv[1]) ? argv[1] : "";
+    std::string start = (argc > 2 && argv[2]) ? argv[2] : "";
+    std::string status = (argc > 3 && argv[3]) ? argv[3] : "OPEN";
+    *res += id + "," + name + "," + start + "," + status + ";";
+    return 0;
+  };
+  char *zErrMsg = 0;
+  sqlite3_exec(db, sql.c_str(), cb, &list, &zErrMsg);
+  if (zErrMsg)
+    sqlite3_free(zErrMsg);
+  return list;
+}
+
+bool DatabaseManager::getRoomMeta(int roomId, int &outCreatedByUserId,
+                                  std::string &outName,
+                                  std::string &outStartTime,
+                                  std::string &outStatus) {
+  outCreatedByUserId = -1;
+  outName.clear();
+  outStartTime.clear();
+  outStatus.clear();
+
+  struct MetaData {
+    int createdBy = -1;
+    std::string name;
+    std::string start;
+    std::string status;
+    bool found = false;
+  } meta;
+
+  std::string sql =
+      "SELECT created_by, name, start_time, status FROM rooms WHERE id=" +
+      std::to_string(roomId) + " LIMIT 1;";
+
+  auto cb = [](void *data, int argc, char **argv, char **col) -> int {
+    (void)col;
+    auto *m = static_cast<MetaData *>(data);
+    m->found = true;
+    m->createdBy = (argc > 0 && argv[0]) ? std::stoi(argv[0]) : -1;
+    m->name = (argc > 1 && argv[1]) ? argv[1] : "";
+    m->start = (argc > 2 && argv[2]) ? argv[2] : "";
+    m->status = (argc > 3 && argv[3]) ? argv[3] : "";
+    return 0;
+  };
+
+  char *zErrMsg = 0;
+  int rc = sqlite3_exec(db, sql.c_str(), cb, &meta, &zErrMsg);
+  if (rc != SQLITE_OK) {
+    if (zErrMsg)
+      sqlite3_free(zErrMsg);
+    return false;
+  }
+  if (zErrMsg)
+    sqlite3_free(zErrMsg);
+
+  if (!meta.found)
+    return false;
+
+  outCreatedByUserId = meta.createdBy;
+  outName = meta.name;
+  outStartTime = meta.start;
+  outStatus = meta.status;
+  return true;
+}
+
+std::string DatabaseManager::getProductPayloadForEdit(int roomId) {
+  // Format: Name,Start,BuyNow,Duration,Description;...
+  std::string payload;
+  std::string sql =
+      "SELECT name, start_price, buy_now_price, duration, description "
+      "FROM products WHERE room_id=" +
+      std::to_string(roomId) + " ORDER BY id ASC;";
+
+  auto cb = [](void *data, int argc, char **argv, char **col) -> int {
+    (void)col;
+    auto *res = static_cast<std::string *>(data);
+    std::string name = (argc > 0 && argv[0]) ? argv[0] : "";
+    std::string start = (argc > 1 && argv[1]) ? argv[1] : "0";
+    std::string buyNow = (argc > 2 && argv[2]) ? argv[2] : "0";
+    std::string duration = (argc > 3 && argv[3]) ? argv[3] : "0";
+    std::string desc = (argc > 4 && argv[4]) ? argv[4] : "";
+    name = sanitizeProtocolField(name);
+    desc = sanitizeProtocolField(desc);
+    *res += name + "," + start + "," + buyNow + "," + duration + "," + desc +
+            ";";
+    return 0;
+  };
+
+  char *zErrMsg = 0;
+  sqlite3_exec(db, sql.c_str(), cb, &payload, &zErrMsg);
+  if (zErrMsg)
+    sqlite3_free(zErrMsg);
+  return payload;
+}
+
+void DatabaseManager::deleteProductsForRoom(int roomId) {
+  std::string sql = "DELETE FROM products WHERE room_id=" +
+                    std::to_string(roomId) + ";";
+  char *zErrMsg = 0;
+  sqlite3_exec(db, sql.c_str(), 0, 0, &zErrMsg);
+  if (zErrMsg)
+    sqlite3_free(zErrMsg);
+}
+
+void DatabaseManager::updateRoomStartTime(int roomId,
+                                          const std::string &startTime) {
+  std::string safeStart = escapeSqlString(startTime);
+  std::string sql = "UPDATE rooms SET start_time='" + safeStart +
+                    "' WHERE id=" + std::to_string(roomId) + ";";
+  char *zErrMsg = 0;
+  sqlite3_exec(db, sql.c_str(), 0, 0, &zErrMsg);
+  if (zErrMsg)
+    sqlite3_free(zErrMsg);
 }
 
 // Helper structs for loading

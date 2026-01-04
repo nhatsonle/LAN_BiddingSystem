@@ -30,6 +30,9 @@ public:
     QString getRoomName() const;
     QString getStartTimeString() const;
     std::vector<ProductInfo> getProductList() const;
+    void setRoomName(const QString &name);
+    void setStartTimeString(const QString &timeString);
+    void setProductList(const std::vector<ProductInfo> &products);
 
 private slots:
     void on_btnAddProduct_clicked();
