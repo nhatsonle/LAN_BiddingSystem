@@ -133,16 +133,16 @@
          <string>Xin chào, [Username]</string>
         </property>
        </widget>
-       <widget class="QListWidget" name="listRooms">
-        <property name="geometry">
-         <rect>
-          <x>20</x>
-          <y>80</y>
-          <width>681</width>
-          <height>321</height>
-         </rect>
-        </property>
-       </widget>
+       <widget class="QTableWidget" name="listRooms">
+         <property name="geometry">
+          <rect>
+           <x>20</x>
+           <y>80</y>
+           <width>681</width>
+           <height>321</height>
+          </rect>
+         </property>
+        </widget>
        <widget class="QPushButton" name="btnCreateRoom">
         <property name="geometry">
          <rect>
