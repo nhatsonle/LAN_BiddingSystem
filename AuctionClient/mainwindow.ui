@@ -191,8 +191,8 @@ QPushButton:hover { background-color: #219150; }</string>
        <widget class="QPushButton" name="btnProfile">
         <property name="geometry">
          <rect>
-          <x>380</x>
-          <y>430</y>
+          <x>140</x>
+          <y>480</y>
           <width>101</width>
           <height>31</height>
          </rect>
