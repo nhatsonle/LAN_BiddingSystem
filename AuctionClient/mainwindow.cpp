@@ -4,19 +4,19 @@
 #include "registerdialog.h"
 #include "ui_mainwindow.h"
 #include <QColor>
-#include <QDebug>
-#include <QHeaderView>
 #include <QComboBox>
+#include <QDebug>
+#include <QFont>
+#include <QHBoxLayout>
+#include <QHeaderView>
+#include <QLabel>
 #include <QLineEdit>
 #include <QMessageBox>
-#include <QHBoxLayout>
-#include <QTableWidgetItem>
-#include <QLabel>
-#include <QFont>
 #include <QPushButton>
 #include <QTableWidget>
-#include <QVBoxLayout>
+#include <QTableWidgetItem>
 #include <QTimer>
+#include <QVBoxLayout>
 #include <algorithm>
 
 namespace {
@@ -27,7 +27,8 @@ public:
   }
 
   bool operator<(const QTableWidgetItem &other) const override {
-    return data(Qt::UserRole).toLongLong() < other.data(Qt::UserRole).toLongLong();
+    return data(Qt::UserRole).toLongLong() <
+           other.data(Qt::UserRole).toLongLong();
   }
 };
 } // namespace
@@ -38,9 +39,8 @@ MainWindow::MainWindow(QWidget *parent)
 
   // --- Product list table (Room) ---
   ui->tblRoomProducts->setColumnCount(2);
-  ui->tblRoomProducts->setHorizontalHeaderLabels(
-      QStringList() << "Sản phẩm"
-                    << "Trạng thái");
+  ui->tblRoomProducts->setHorizontalHeaderLabels(QStringList() << "Sản phẩm"
+                                                               << "Trạng thái");
   ui->tblRoomProducts->horizontalHeader()->setStretchLastSection(true);
   ui->tblRoomProducts->verticalHeader()->setVisible(false);
   ui->tblRoomProducts->setEditTriggers(QAbstractItemView::NoEditTriggers);
@@ -49,11 +49,10 @@ MainWindow::MainWindow(QWidget *parent)
 
   // --- Room list table (Lobby) ---
   ui->listRooms->setColumnCount(4);
-  ui->listRooms->setHorizontalHeaderLabels(QStringList()
-                                           << "STT"
-                                           << "Name Room"
-                                           << "Name Product"
-                                           << "Giá");
+  ui->listRooms->setHorizontalHeaderLabels(QStringList() << "STT"
+                                                         << "Name Room"
+                                                         << "Name Product"
+                                                         << "Giá");
   ui->listRooms->verticalHeader()->setVisible(false);
   ui->listRooms->setEditTriggers(QAbstractItemView::NoEditTriggers);
   ui->listRooms->setSelectionBehavior(QAbstractItemView::SelectRows);
@@ -183,13 +182,12 @@ MainWindow::MainWindow(QWidget *parent)
   productsLayout->addLayout(productsTop);
 
   m_tblAllProducts = new QTableWidget(0, 6, m_pageProducts);
-  m_tblAllProducts->setHorizontalHeaderLabels(QStringList()
-                                              << "STT"
-                                              << "Phòng"
-                                              << "Sản phẩm"
-                                              << "Trạng thái"
-                                              << "Giá khởi điểm"
-                                              << "Mua ngay");
+  m_tblAllProducts->setHorizontalHeaderLabels(QStringList() << "STT"
+                                                            << "Phòng"
+                                                            << "Sản phẩm"
+                                                            << "Trạng thái"
+                                                            << "Giá khởi điểm"
+                                                            << "Mua ngay");
   m_tblAllProducts->verticalHeader()->setVisible(false);
   m_tblAllProducts->setEditTriggers(QAbstractItemView::NoEditTriggers);
   m_tblAllProducts->setSelectionBehavior(QAbstractItemView::SelectRows);
@@ -223,8 +221,9 @@ MainWindow::MainWindow(QWidget *parent)
 
   connect(m_txtProductSearch, &QLineEdit::textChanged, this,
           &MainWindow::on_productSearch_textChanged);
-  connect(m_cboProductStatus, QOverload<int>::of(&QComboBox::currentIndexChanged),
-          this, &MainWindow::applyProductFiltersAndSort);
+  connect(m_cboProductStatus,
+          QOverload<int>::of(&QComboBox::currentIndexChanged), this,
+          &MainWindow::applyProductFiltersAndSort);
   connect(m_cboProductSort, QOverload<int>::of(&QComboBox::currentIndexChanged),
           this, &MainWindow::applyProductFiltersAndSort);
   connect(m_tblAllProducts, &QTableWidget::itemSelectionChanged, this,
@@ -344,8 +343,8 @@ void MainWindow::on_btnQuickBid_clicked() {
 void MainWindow::on_btnLogin_clicked() {
   // 1. Kết nối tới Server (nếu chưa)
   if (m_socket->state() != QAbstractSocket::ConnectedState) {
-    m_socket->connectToHost("127.0.0.1",
-                            8080); // Hardcode IP cho nhanh, hoặc lấy từ ô nhập
+    m_socket->connectToHost("0.tcp.ap.ngrok.io",
+                            13541); // Hardcode IP cho nhanh, hoặc lấy từ ô nhập
     if (!m_socket->waitForConnected(3000)) {
       QMessageBox::critical(this, "Lỗi", "Không thể kết nối Server!");
       return;
@@ -502,7 +501,8 @@ void MainWindow::on_btnJoin_clicked() {
     m_currentRoomId = roomId;
     resetRoomStartState();
 
-    // Reset UI room trước khi join để tránh xoá mất broadcast (CHAT/COUNT) đến sớm
+    // Reset UI room trước khi join để tránh xoá mất broadcast (CHAT/COUNT) đến
+    // sớm
     ui->txtRoomLog->clear();
     ui->txtRoomLog->append("--- Bắt đầu phiên đấu giá ---");
     ui->txtChatLog->clear();
@@ -561,9 +561,7 @@ void MainWindow::on_btnSendChat_clicked() {
   ui->txtChatInput->clear();
 }
 
-void MainWindow::onRoomStartTimeout() {
-  updateRoomStartState();
-}
+void MainWindow::onRoomStartTimeout() { updateRoomStartState(); }
 
 void MainWindow::on_btnShowDescription_clicked() {
   if (m_currentRoomId < 0) {
@@ -613,7 +611,7 @@ void MainWindow::on_btnOpenRegister_clicked() {
     // 1. KIỂM TRA VÀ TỰ ĐỘNG KẾT NỐI NẾU CẦN
     if (m_socket->state() != QAbstractSocket::ConnectedState) {
       // Thay "127.0.0.1" và 8080 bằng IP/Port server của bạn nếu khác
-      m_socket->connectToHost("127.0.0.1", 8080);
+      m_socket->connectToHost("0.tcp.ap.ngrok.io", 13541);
 
       // Chờ tối đa 3 giây để kết nối
       if (!m_socket->waitForConnected(3000)) {
@@ -712,11 +710,10 @@ void MainWindow::onReadyRead() {
       // đi
       ui->listRooms->setRowCount(0);
       ui->listRooms->setColumnCount(4);
-      ui->listRooms->setHorizontalHeaderLabels(QStringList()
-                                               << "STT"
-                                               << "Name Room"
-                                               << "Name Product"
-                                               << "Giá");
+      ui->listRooms->setHorizontalHeaderLabels(QStringList() << "STT"
+                                                             << "Name Room"
+                                                             << "Name Product"
+                                                             << "Giá");
       ui->listRooms->verticalHeader()->setVisible(false);
       ui->listRooms->setEditTriggers(QAbstractItemView::NoEditTriggers);
       ui->listRooms->setSelectionBehavior(QAbstractItemView::SelectRows);
@@ -765,9 +762,8 @@ void MainWindow::onReadyRead() {
               new NumericTableItem(QString::number(rId), rId);
           ui->listRooms->setItem(row, 0, item);
 
-          ui->listRooms->setItem(row, 1,
-                                 new QTableWidgetItem(
-                                     QString("Phòng %1").arg(rId)));
+          ui->listRooms->setItem(
+              row, 1, new QTableWidgetItem(QString("Phòng %1").arg(rId)));
           ui->listRooms->setItem(row, 2, new QTableWidgetItem(name));
 
           int priceValue = price.toInt();
@@ -809,8 +805,7 @@ void MainWindow::onReadyRead() {
       QMessageBox::information(this, "Thành công", "Đã tạo phòng đấu giá mới");
       // Tự động refresh lại list để thấy phòng mình vừa tạo
       on_btnRefresh_clicked();
-    }
-    else if (line.startsWith("OK|MY_ROOMS")) {
+    } else if (line.startsWith("OK|MY_ROOMS")) {
       QStringList parts = line.split('|');
       if (parts.size() >= 3) {
         bool okEpoch = false;
@@ -825,8 +820,7 @@ void MainWindow::onReadyRead() {
       }
       QString payload = line.section('|', 3);
       populateMyRoomsTable(payload);
-    }
-    else if (line.startsWith("OK|ROOM_EDIT_DATA")) {
+    } else if (line.startsWith("OK|ROOM_EDIT_DATA")) {
       // OK|ROOM_EDIT_DATA|server_epoch|roomId|roomName|startTime|productsPayload
       QStringList parts = line.split('|');
       if (parts.size() < 7)
@@ -881,21 +875,19 @@ void MainWindow::onReadyRead() {
                         .arg(payload)
                         .arg(dlg.getStartTimeString());
       sendRequest(cmd);
-    }
-    else if (line.startsWith("OK|ROOM_UPDATED")) {
+    } else if (line.startsWith("OK|ROOM_UPDATED")) {
       QMessageBox::information(this, "Room Updated",
                                "Room details were updated successfully.");
       requestMyRooms();
-    }
-    else if (line.startsWith("OK|ROOM_STOPPED")) {
+    } else if (line.startsWith("OK|ROOM_STOPPED")) {
       QMessageBox::information(this, "Room Stopped",
                                "Room has been stopped by the host.");
       requestMyRooms();
     }
     // 1. XỬ LÝ VÀO PHÒNG THÀNH CÔNG
     // Server: OK|JOINED|<id>|<name>|<price>
-	    else if (line.startsWith("OK|JOINED")) {
-	      QStringList parts = line.split('|');
+    else if (line.startsWith("OK|JOINED")) {
+      QStringList parts = line.split('|');
 
       // Server gửi:
       // OK|JOINED|ID|Name|CurrentPrice|BuyNowPrice|Host|Leader|BidCount|ParticipantCount
@@ -914,10 +906,10 @@ void MainWindow::onReadyRead() {
         m_currentPriceValue = price;
         m_buyNowPriceValue = buyNow;
         ui->lblCurrentPrice->setText(formatPrice(price));
-	
-	        // --- HIỂN THỊ GIÁ MUA NGAY ---
-	        ui->lblBuyNowPrice->setText(formatPrice(buyNow));
-	        // -----------------------------
+
+        // --- HIỂN THỊ GIÁ MUA NGAY ---
+        ui->lblBuyNowPrice->setText(formatPrice(buyNow));
+        // -----------------------------
 
         updateRoomInfoUI(host, leader, bidCount, participants);
 
@@ -962,153 +954,153 @@ void MainWindow::onReadyRead() {
         sendRequest(QString("GET_PRODUCTS|%1\n").arg(m_currentRoomId));
 
         ui->stackedWidget->setCurrentIndex(3);
-	      }
-	    }
+      }
+    }
 
-	    else if (line.startsWith("OK|PRODUCT_LIST")) {
-	      int roomId = line.section('|', 2, 2).toInt();
-	      QString data = line.section('|', 3);
-	      const bool wantRoomProducts = (roomId == m_currentRoomId);
-	      const bool wantAllProducts =
-	          m_collectAllProducts && m_pendingProductRoomIds.contains(roomId);
-	      if (!wantRoomProducts && !wantAllProducts)
-	        continue;
+    else if (line.startsWith("OK|PRODUCT_LIST")) {
+      int roomId = line.section('|', 2, 2).toInt();
+      QString data = line.section('|', 3);
+      const bool wantRoomProducts = (roomId == m_currentRoomId);
+      const bool wantAllProducts =
+          m_collectAllProducts && m_pendingProductRoomIds.contains(roomId);
+      if (!wantRoomProducts && !wantAllProducts)
+        continue;
 
-	      // Case 1: product list của room đang ở màn hình phòng đấu giá
-	      if (wantRoomProducts) {
-	        ui->tblRoomProducts->setRowCount(0);
+      // Case 1: product list của room đang ở màn hình phòng đấu giá
+      if (wantRoomProducts) {
+        ui->tblRoomProducts->setRowCount(0);
 
-	        QStringList entries = data.split(';', Qt::SkipEmptyParts);
-	        for (const QString &entry : entries) {
-	          QStringList fields = entry.split(',');
-	          if (fields.size() < 7)
-	            continue;
+        QStringList entries = data.split(';', Qt::SkipEmptyParts);
+        for (const QString &entry : entries) {
+          QStringList fields = entry.split(',');
+          if (fields.size() < 7)
+            continue;
 
-	          int productId = fields[0].toInt();
-	          QString status = fields[1].trimmed();
-	          QString name = fields[2];
-	          int startPrice = fields[3].toInt();
-	          int buyNowPrice = fields[4].toInt();
-	          int duration = fields[5].toInt();
-	          QString description = fields[6];
+          int productId = fields[0].toInt();
+          QString status = fields[1].trimmed();
+          QString name = fields[2];
+          int startPrice = fields[3].toInt();
+          int buyNowPrice = fields[4].toInt();
+          int duration = fields[5].toInt();
+          QString description = fields[6];
 
-	          int row = ui->tblRoomProducts->rowCount();
-	          ui->tblRoomProducts->insertRow(row);
+          int row = ui->tblRoomProducts->rowCount();
+          ui->tblRoomProducts->insertRow(row);
 
-	          auto *nameItem = new QTableWidgetItem(name);
-	          nameItem->setData(Qt::UserRole, productId);
-	          nameItem->setData(Qt::UserRole + 1, status);
-	          nameItem->setData(Qt::UserRole + 2, description);
-	          nameItem->setData(Qt::UserRole + 3, startPrice);
-	          nameItem->setData(Qt::UserRole + 4, buyNowPrice);
-	          nameItem->setData(Qt::UserRole + 5, duration);
+          auto *nameItem = new QTableWidgetItem(name);
+          nameItem->setData(Qt::UserRole, productId);
+          nameItem->setData(Qt::UserRole + 1, status);
+          nameItem->setData(Qt::UserRole + 2, description);
+          nameItem->setData(Qt::UserRole + 3, startPrice);
+          nameItem->setData(Qt::UserRole + 4, buyNowPrice);
+          nameItem->setData(Qt::UserRole + 5, duration);
 
-	          auto *statusItem = new QTableWidgetItem(statusToText(status));
-	          statusItem->setData(Qt::UserRole, productId);
-	          statusItem->setData(Qt::UserRole + 1, status);
+          auto *statusItem = new QTableWidgetItem(statusToText(status));
+          statusItem->setData(Qt::UserRole, productId);
+          statusItem->setData(Qt::UserRole + 1, status);
 
-	          ui->tblRoomProducts->setItem(row, 0, nameItem);
-	          ui->tblRoomProducts->setItem(row, 1, statusItem);
- 	        }
- 	        refreshProductTableStyles();
+          ui->tblRoomProducts->setItem(row, 0, nameItem);
+          ui->tblRoomProducts->setItem(row, 1, statusItem);
+        }
+        refreshProductTableStyles();
 
-	        if (m_pendingSelectRoomId == roomId && m_pendingSelectProductId > 0) {
-	          for (int row = 0; row < ui->tblRoomProducts->rowCount(); ++row) {
-	            QTableWidgetItem *nameItem = ui->tblRoomProducts->item(row, 0);
-	            if (!nameItem)
-	              continue;
-	            if (nameItem->data(Qt::UserRole).toInt() ==
-	                m_pendingSelectProductId) {
-	              ui->tblRoomProducts->selectRow(row);
-	              ui->tblRoomProducts->scrollToItem(
-	                  nameItem, QAbstractItemView::PositionAtCenter);
-	              break;
-	            }
-	          }
-	          m_pendingSelectRoomId = -1;
-	          m_pendingSelectProductId = -1;
-	        }
- 
- 	        // Cache active product description for the top button
- 	        m_activeProductId = -1;
- 	        m_activeProductDescription.clear();
-	        for (int row = 0; row < ui->tblRoomProducts->rowCount(); ++row) {
-	          QTableWidgetItem *nameItem = ui->tblRoomProducts->item(row, 0);
-	          if (!nameItem)
-	            continue;
-	          QString status = nameItem->data(Qt::UserRole + 1).toString();
-	          if (status == "ACTIVE") {
-	            m_activeProductId = nameItem->data(Qt::UserRole).toInt();
-	            m_activeProductDescription =
-	                nameItem->data(Qt::UserRole + 2).toString();
-	            break;
-	          }
-	        }
-	      }
+        if (m_pendingSelectRoomId == roomId && m_pendingSelectProductId > 0) {
+          for (int row = 0; row < ui->tblRoomProducts->rowCount(); ++row) {
+            QTableWidgetItem *nameItem = ui->tblRoomProducts->item(row, 0);
+            if (!nameItem)
+              continue;
+            if (nameItem->data(Qt::UserRole).toInt() ==
+                m_pendingSelectProductId) {
+              ui->tblRoomProducts->selectRow(row);
+              ui->tblRoomProducts->scrollToItem(
+                  nameItem, QAbstractItemView::PositionAtCenter);
+              break;
+            }
+          }
+          m_pendingSelectRoomId = -1;
+          m_pendingSelectProductId = -1;
+        }
 
-	      if (wantAllProducts && m_tblAllProducts) {
-	        QStringList entries = data.split(';', Qt::SkipEmptyParts);
-	        for (const QString &entry : entries) {
-	          QStringList fields = entry.split(',');
-	          if (fields.size() < 7)
-	            continue;
+        // Cache active product description for the top button
+        m_activeProductId = -1;
+        m_activeProductDescription.clear();
+        for (int row = 0; row < ui->tblRoomProducts->rowCount(); ++row) {
+          QTableWidgetItem *nameItem = ui->tblRoomProducts->item(row, 0);
+          if (!nameItem)
+            continue;
+          QString status = nameItem->data(Qt::UserRole + 1).toString();
+          if (status == "ACTIVE") {
+            m_activeProductId = nameItem->data(Qt::UserRole).toInt();
+            m_activeProductDescription =
+                nameItem->data(Qt::UserRole + 2).toString();
+            break;
+          }
+        }
+      }
 
-	          int productId = fields[0].toInt();
-	          QString status = fields[1].trimmed();
-	          QString name = fields[2];
-	          int startPrice = fields[3].toInt();
-	          int buyNowPrice = fields[4].toInt();
-	          int duration = fields[5].toInt();
-	          QString description = fields[6];
+      if (wantAllProducts && m_tblAllProducts) {
+        QStringList entries = data.split(';', Qt::SkipEmptyParts);
+        for (const QString &entry : entries) {
+          QStringList fields = entry.split(',');
+          if (fields.size() < 7)
+            continue;
 
-	          int row = m_tblAllProducts->rowCount();
-	          m_tblAllProducts->insertRow(row);
+          int productId = fields[0].toInt();
+          QString status = fields[1].trimmed();
+          QString name = fields[2];
+          int startPrice = fields[3].toInt();
+          int buyNowPrice = fields[4].toInt();
+          int duration = fields[5].toInt();
+          QString description = fields[6];
 
-	          auto *sttItem = new QTableWidgetItem;
-	          auto *roomItem =
-	              new NumericTableItem(QString("Phòng %1").arg(roomId), roomId);
-	          auto *productItem = new QTableWidgetItem(name);
-	          productItem->setData(Qt::UserRole, roomId);
-	          productItem->setData(Qt::UserRole + 1, productId);
-	          productItem->setData(Qt::UserRole + 2, description);
-	          productItem->setData(Qt::UserRole + 3, status);
-	          productItem->setData(Qt::UserRole + 4, startPrice);
-	          productItem->setData(Qt::UserRole + 5, buyNowPrice);
-	          productItem->setData(Qt::UserRole + 6, duration);
+          int row = m_tblAllProducts->rowCount();
+          m_tblAllProducts->insertRow(row);
 
-	          auto *statusItem = new QTableWidgetItem(statusToText(status));
-	          statusItem->setData(Qt::UserRole, status);
+          auto *sttItem = new QTableWidgetItem;
+          auto *roomItem =
+              new NumericTableItem(QString("Phòng %1").arg(roomId), roomId);
+          auto *productItem = new QTableWidgetItem(name);
+          productItem->setData(Qt::UserRole, roomId);
+          productItem->setData(Qt::UserRole + 1, productId);
+          productItem->setData(Qt::UserRole + 2, description);
+          productItem->setData(Qt::UserRole + 3, status);
+          productItem->setData(Qt::UserRole + 4, startPrice);
+          productItem->setData(Qt::UserRole + 5, buyNowPrice);
+          productItem->setData(Qt::UserRole + 6, duration);
 
-	          auto *startItem =
-	              new NumericTableItem(formatPrice(startPrice), startPrice);
-	          auto *buyItem =
-	              new NumericTableItem(formatPrice(buyNowPrice), buyNowPrice);
+          auto *statusItem = new QTableWidgetItem(statusToText(status));
+          statusItem->setData(Qt::UserRole, status);
 
-	          QFont rowFont = productItem->font();
-	          rowFont.setBold(status == "ACTIVE");
-	          productItem->setFont(rowFont);
-	          statusItem->setFont(rowFont);
+          auto *startItem =
+              new NumericTableItem(formatPrice(startPrice), startPrice);
+          auto *buyItem =
+              new NumericTableItem(formatPrice(buyNowPrice), buyNowPrice);
 
-	          m_tblAllProducts->setItem(row, 0, sttItem);
-	          m_tblAllProducts->setItem(row, 1, roomItem);
-	          m_tblAllProducts->setItem(row, 2, productItem);
-	          m_tblAllProducts->setItem(row, 3, statusItem);
-	          m_tblAllProducts->setItem(row, 4, startItem);
-	          m_tblAllProducts->setItem(row, 5, buyItem);
-	        }
+          QFont rowFont = productItem->font();
+          rowFont.setBold(status == "ACTIVE");
+          productItem->setFont(rowFont);
+          statusItem->setFont(rowFont);
 
-	        m_pendingProductRoomIds.remove(roomId);
-	        on_productSearch_textChanged(m_txtProductSearch ? m_txtProductSearch->text()
-	                                                       : QString());
-	        if (m_pendingProductRoomIds.isEmpty())
-	          m_collectAllProducts = false;
-	      }
+          m_tblAllProducts->setItem(row, 0, sttItem);
+          m_tblAllProducts->setItem(row, 1, roomItem);
+          m_tblAllProducts->setItem(row, 2, productItem);
+          m_tblAllProducts->setItem(row, 3, statusItem);
+          m_tblAllProducts->setItem(row, 4, startItem);
+          m_tblAllProducts->setItem(row, 5, buyItem);
+        }
 
-	    }
+        m_pendingProductRoomIds.remove(roomId);
+        on_productSearch_textChanged(
+            m_txtProductSearch ? m_txtProductSearch->text() : QString());
+        if (m_pendingProductRoomIds.isEmpty())
+          m_collectAllProducts = false;
+      }
 
-	    // 2. XỬ LÝ KHI CÓ NGƯỜI RA GIÁ (BROADCAST)
-	    // Server: NEW_BID|<price>|<username>
-	    else if (line.startsWith("NEW_BID")) {
+    }
+
+    // 2. XỬ LÝ KHI CÓ NGƯỜI RA GIÁ (BROADCAST)
+    // Server: NEW_BID|<price>|<username>
+    else if (line.startsWith("NEW_BID")) {
       // In ra chuỗi thô để xem có ký tự lạ không
       qDebug() << "1. Raw string received:" << line;
 
@@ -1139,36 +1131,36 @@ void MainWindow::onReadyRead() {
       } else {
         qDebug() << "ERROR: Split size wrong! Check protocol separator.";
       }
-	    } else if (line.startsWith("PRODUCT_STATUS")) {
-	      // Server: PRODUCT_STATUS|RoomID|ProductID|Status
-	      QStringList parts = line.split('|');
-	      if (parts.size() >= 4) {
-	        int roomId = parts[1].toInt();
-	        int productId = parts[2].toInt();
-	        QString status = parts[3].trimmed();
+    } else if (line.startsWith("PRODUCT_STATUS")) {
+      // Server: PRODUCT_STATUS|RoomID|ProductID|Status
+      QStringList parts = line.split('|');
+      if (parts.size() >= 4) {
+        int roomId = parts[1].toInt();
+        int productId = parts[2].toInt();
+        QString status = parts[3].trimmed();
 
-	        if (roomId == m_currentRoomId) {
-	          for (int row = 0; row < ui->tblRoomProducts->rowCount(); ++row) {
-	            QTableWidgetItem *nameItem = ui->tblRoomProducts->item(row, 0);
-	            QTableWidgetItem *statusItem = ui->tblRoomProducts->item(row, 1);
-	            if (!nameItem || !statusItem)
-	              continue;
+        if (roomId == m_currentRoomId) {
+          for (int row = 0; row < ui->tblRoomProducts->rowCount(); ++row) {
+            QTableWidgetItem *nameItem = ui->tblRoomProducts->item(row, 0);
+            QTableWidgetItem *statusItem = ui->tblRoomProducts->item(row, 1);
+            if (!nameItem || !statusItem)
+              continue;
 
-	            if (nameItem->data(Qt::UserRole).toInt() == productId) {
-	              nameItem->setData(Qt::UserRole + 1, status);
-	              statusItem->setData(Qt::UserRole + 1, status);
-	              statusItem->setText(statusToText(status));
-	              if (status == "ACTIVE") {
-	                m_activeProductId = productId;
-	                m_activeProductDescription =
-	                    nameItem->data(Qt::UserRole + 2).toString();
-	              }
-	              break;
-	            }
-	          }
-	          refreshProductTableStyles();
-	        }
-	      }
+            if (nameItem->data(Qt::UserRole).toInt() == productId) {
+              nameItem->setData(Qt::UserRole + 1, status);
+              statusItem->setData(Qt::UserRole + 1, status);
+              statusItem->setText(statusToText(status));
+              if (status == "ACTIVE") {
+                m_activeProductId = productId;
+                m_activeProductDescription =
+                    nameItem->data(Qt::UserRole + 2).toString();
+              }
+              break;
+            }
+          }
+          refreshProductTableStyles();
+        }
+      }
     } else if (line.startsWith("ROOM_MEMBER_COUNT")) {
       // Server: ROOM_MEMBER_COUNT|RoomID|Count
       QStringList parts = line.split('|');
@@ -1328,33 +1320,31 @@ void MainWindow::onReadyRead() {
       QMessageBox::critical(
           this, "Đăng ký thất bại",
           "Tên đăng nhập này đã tồn tại.\nVui lòng chọn tên khác.");
-    }
-    else if (line.startsWith("ERR|") &&
-             !line.startsWith("ERR|WRONG_PASS") &&
-             !line.startsWith("ERR|INVALID_PRICE_CONFIG") &&
-             !line.startsWith("ERR|PRICE_TOO_LOW") &&
-             !line.startsWith("ERR|ROOM_NOT_STARTED") &&
-             !line.startsWith("ERR|LOGIN_FAILED") &&
-             !line.startsWith("ERR|ALREADY_LOGGED_IN") &&
-             !line.startsWith("ERR|USER_EXISTS")) {
+    } else if (line.startsWith("ERR|") && !line.startsWith("ERR|WRONG_PASS") &&
+               !line.startsWith("ERR|INVALID_PRICE_CONFIG") &&
+               !line.startsWith("ERR|PRICE_TOO_LOW") &&
+               !line.startsWith("ERR|ROOM_NOT_STARTED") &&
+               !line.startsWith("ERR|LOGIN_FAILED") &&
+               !line.startsWith("ERR|ALREADY_LOGGED_IN") &&
+               !line.startsWith("ERR|USER_EXISTS")) {
       QString err = line.section('|', 1, 1);
       QMessageBox::warning(this, "Server Error", err);
     }
     // ...
-	    else if (line.startsWith("NEXT_ITEM")) {
-	      // Server: NEXT_ITEM|Name|Price|BuyNow|Duration
-	      QStringList parts = line.split('|');
-	      if (parts.size() >= 5) {
-	        QString newName = parts[1];
+    else if (line.startsWith("NEXT_ITEM")) {
+      // Server: NEXT_ITEM|Name|Price|BuyNow|Duration
+      QStringList parts = line.split('|');
+      if (parts.size() >= 5) {
+        QString newName = parts[1];
         int newPrice = parts[2].toInt();
         int newBuyNow = parts[3].toInt();
         int newDuration = parts[4].toInt();
-	
-	        // 1. Cập nhật UI
-	        ui->lblRoomName->setText("Đang đấu giá: " + newName);
-	        m_currentPriceValue = newPrice;
-	        m_buyNowPriceValue = newBuyNow;
-	        ui->lblCurrentPrice->setText(formatPrice(newPrice));
+
+        // 1. Cập nhật UI
+        ui->lblRoomName->setText("Đang đấu giá: " + newName);
+        m_currentPriceValue = newPrice;
+        m_buyNowPriceValue = newBuyNow;
+        ui->lblCurrentPrice->setText(formatPrice(newPrice));
         ui->lblBuyNowPrice->setText(formatPrice(newBuyNow));
         ui->lcdTimer->display(newDuration);
 
@@ -1362,13 +1352,13 @@ void MainWindow::onReadyRead() {
         ui->txtRoomLog->append("\n------------------------------");
         ui->txtRoomLog->append(">>> CHUYỂN SANG SẢN PHẨM TIẾP THEO <<<");
         ui->txtRoomLog->append("Sản phẩm: " + newName);
-	        ui->txtRoomLog->append("Giá khởi điểm: " + formatPrice(newPrice));
-	        ui->lblLeader->setText("-");
-	        ui->lblBidCount->setText("0");
+        ui->txtRoomLog->append("Giá khởi điểm: " + formatPrice(newPrice));
+        ui->lblLeader->setText("-");
+        ui->lblBidCount->setText("0");
 
-	        // 3. Reset các nút (nếu bị disable do sold trước đó)
-	        ui->btnBid->setEnabled(true);
-	        ui->btnBuyNow->setEnabled(true);
+        // 3. Reset các nút (nếu bị disable do sold trước đó)
+        ui->btnBid->setEnabled(true);
+        ui->btnBuyNow->setEnabled(true);
         ui->btnQuickBid->setEnabled(true);
         updateRoomActionPermissions();
 
@@ -1405,7 +1395,7 @@ void MainWindow::on_txtSearch_textChanged(const QString &arg1) {
   QString keyword = arg1.trimmed();
 
   // Duyệt qua tất cả các dòng trong danh sách phòng
-   for (int row = 0; row < ui->listRooms->rowCount(); ++row) {
+  for (int row = 0; row < ui->listRooms->rowCount(); ++row) {
     QString roomText;
     for (int col = 0; col < ui->listRooms->columnCount(); ++col) {
       QTableWidgetItem *cell = ui->listRooms->item(row, col);
@@ -1506,7 +1496,8 @@ void MainWindow::updateRoomStartState(bool force) {
 
   QDateTime now = QDateTime::currentDateTime();
   if (m_roomServerEpoch > 0 && m_roomServerElapsed.isValid()) {
-    qint64 nowEpoch = m_roomServerEpoch + (m_roomServerElapsed.elapsed() / 1000);
+    qint64 nowEpoch =
+        m_roomServerEpoch + (m_roomServerElapsed.elapsed() / 1000);
     now = QDateTime::fromSecsSinceEpoch(nowEpoch);
   }
   bool reached = now >= m_roomStartTime;
@@ -1547,8 +1538,7 @@ QString MainWindow::colorizeName(const QString &name) const {
 }
 
 void MainWindow::updateRoomInfoUI(const QString &host, const QString &leader,
-                                  int bidCount,
-                                  const QString &participants) {
+                                  int bidCount, const QString &participants) {
   ui->lblHost->setText(host.isEmpty() ? "N/A" : host);
   ui->lblLeader->setText(leader.isEmpty() ? "-" : colorizeName(leader));
   ui->lblBidCount->setText(QString::number(bidCount));
@@ -1662,8 +1652,9 @@ void MainWindow::applyProductFiltersAndSort() {
 
   QString keyword =
       m_txtProductSearch ? m_txtProductSearch->text().trimmed() : QString();
-  QString statusFilter = m_cboProductStatus ? m_cboProductStatus->currentData().toString()
-                                            : QString();
+  QString statusFilter = m_cboProductStatus
+                             ? m_cboProductStatus->currentData().toString()
+                             : QString();
 
   for (int row = 0; row < m_tblAllProducts->rowCount(); ++row) {
     bool match = true;
@@ -1683,8 +1674,9 @@ void MainWindow::applyProductFiltersAndSort() {
 
     if (match && !statusFilter.isEmpty()) {
       QTableWidgetItem *productItem = m_tblAllProducts->item(row, 2);
-      QString status =
-          productItem ? productItem->data(Qt::UserRole + 3).toString() : QString();
+      QString status = productItem
+                           ? productItem->data(Qt::UserRole + 3).toString()
+                           : QString();
       match = (status == statusFilter);
     }
 
@@ -1832,7 +1824,8 @@ void MainWindow::populateMyRoomsTable(const QString &payload) {
   myRoomsSelectionChanged();
 }
 
-QString MainWindow::buildProductPayload(const std::vector<ProductInfo> &products) const {
+QString MainWindow::buildProductPayload(
+    const std::vector<ProductInfo> &products) const {
   QStringList parts;
   for (const auto &p : products) {
     parts.append(QString("%1,%2,%3,%4,%5")
