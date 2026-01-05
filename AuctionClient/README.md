@@ -1,143 +1,59 @@
-# Online Auction System – Client Side
+# Auction Client (Qt C++)
 
-This repository contains the **client-side (GUI)** application for the **Online Auction System**, built using the **Qt Framework**.  
-The client connects to the server via **TCP sockets** to support **real-time interactions** such as live bidding updates and countdown timers.
+This is the desktop client application for the Real-time Auction System, built with the Qt Framework.
 
----
+## Features
 
-## 📌 Overview
+-   **Graphical User Interface (GUI)**:
+    -   **Lobby**: List of active auction rooms using `QTableWidget` for clear columns (ID, Name, Product, Price).
+    -   **Room View**: Real-time updates of bids, chat, countdown timer, and product status.
+    -   **Profile**: View auction history, won items, and **manage finance** (Add Funds).
+-   **Real-time Updates**: Uses `QTcpSocket` to receive live updates (bids, chat, timers, balance) from the Server.
+-   **Finance Integration**:
+    -   Input field to add funds to account.
+    -   Real-time balance display in Lobby and Room views.
+-   **Advanced UI**:
+    -   Refactored "History" and "Won Items" to `QTableWidget` for better data readability.
+    -   Sort/Filter rooms by Price or Name.
 
-- **Application Type**: Desktop GUI Client  
-- **Architecture**: Event-driven (Signal & Slots)  
-- **Communication**: TCP Socket (asynchronous)  
-- **Purpose**: Provide a real-time user interface for participating in online auctions  
+## Prerequisites
 
----
+-   **Qt 5 or Qt 6**: Core, Gui, Widgets, Network modules.
+-   **C++ Compiler**: Compatible with your Qt version (e.g., g++).
+-   **Make/QMake**: For building.
 
-## 🛠 Technology Stack
+## Build & Run
 
-| Category | Technology |
-|--------|------------|
-| Framework | Qt 5 / Qt 6 |
-| Language | C++ |
-| Networking | `QTcpSocket` |
-| UI Components | `QTableWidget`, `QStackedWidget`, Qt Designer |
-| Architecture | Event-driven (Signals & Slots) |
-| Platform | Windows / Linux |
+1.  **Run qmake**:
+    ```bash
+    qmake
+    ```
+    *Note: If `qmake` is not found, ensure it's in your PATH or typically located at `/usr/lib/qt5/bin/qmake`.*
 
----
+2.  **Build**:
+    ```bash
+    make
+    ```
 
-## 📂 Project Structure
+3.  **Run**:
+    ```bash
+    ./AuctionClient
+    ```
 
-### AuctionClient/
-- AuctionClient.pro # Qt project configuration file
-- main.cpp # Application entry point, global stylesheets
-- mainwindow.ui # [View] Main UI (Login, Lobby, Room)
-- mainwindow.h/.cpp # [Controller] UI events & socket data handling
-- createroomdialog.ui # [View] Create room dialog & product input
-- createroomdialog.h/.cpp # [Logic] Add/Edit/Delete products in temporary queue
-- registerdialog.h/.cpp # [Logic] User registration dialog
+## Configuration
 
----
+By default, the client tries to connect to `0.tcp.ap.ngrok.io:13541` (or localhost depending on recent edits).
+To change the server address, modify `mainwindow.cpp` inside `on_btnLogin_clicked` or `on_btnOpenRegister_clicked`.
 
-## 🚀 Build & Run Guide
+## Usage
 
-### Prerequisites
+1.  **Register/Login**: Create an account (Starts with 500k VND) or log in.
+2.  **Lobby**: Browse active rooms. Search or Sort as needed.
+3.  **Join Room**: Double click or select and click "Join".
+4.  **Bidding**: Watch the countdown. Place a bid (must be +10k > current).
+5.  **Profile**: Check "Tài chính" tab to add fake money for testing.
 
-- **Qt Creator**
-- **Compiler**
-  - MinGW (Windows)
-  - GCC / Clang (Linux)
+## Troubleshooting
 
----
-
-### Build & Run Steps
-
-1. Open **Qt Creator**
-2. Double-click `AuctionClient.pro`
-3. Select the appropriate **Kit** (e.g., *Desktop Qt 6.5 MinGW*)
-4. Click **Run** (▶) or press **Ctrl + R**
-
-> ⚠️ The **Server must be running first** before performing login or registration from the client.
-
----
-
-## 🧩 Data Flow & Communication Model
-
-The client operates in a **fully asynchronous** manner.
-
-### Sending Commands
-
-```cpp
-m_socket->write("CMD|ARG\n");
-```
-- Commands are sent immediately
-- The client does not block waiting for a response.
-
-### Receiving Data
-- All incoming data from the server is handled in:
-``` cpp
-MainWindow::onReadyRead()
-```
-- Incoming messages are:
- - Read from the socket
- - Parsed as text commands
- - Reflected directly in the UI
-
-### Best Practice Tip
-Room IDs, product IDs, and bid values are commonly stored in:
-``` cpp
-Qt::UserRole
-```
-This allows efficient access when handling UI click events without string parsing.
-
-## Extending the Client 
-### Example: Add a Quick Chat Feature (Already implemented)
-### Step 1: Design UI (.ui)
-- Open mainwindow.ui
-- Add a new QPushButton
-- Set objectName to:
-``` nginx
-btnChatQuick
-```
-### Step 2: Create Slot Function
-- Right-click the button
-- Select Go to slot... -> clicked()
-Qt Creator generates:
-```cpp
-void MainWindow::on_btnChatQuick_clicked()
-{
-    
-}
-```
-### Step 3: Send Command to Server
-``` cpp
-void MainWindow::on_btnChatQuick_clicked() {
-    if (m_currentRoomId != 0) {
-        // Command format: CHAT|RoomID|Content
-        QString msg = "CHAT|" 
-                    + QString::number(m_currentRoomId) 
-                    + "|Giá cao quá!\n";
-        m_socket->write(msg.toUtf8());
-    }
-}
-```
-### Step 4: Handle Response (Optional)
-If the server broadcasts chat messages, handle them in onReadyRead():
-``` cpp
-else if (line.startsWith("CHAT_MSG")) {
-    // Format: CHAT_MSG|User|Content
-    QStringList parts = line.split('|');
-    ui->txtRoomLog->append(parts[1] + ": " + parts[2]);
-}
-```
-
-## Design Notes
-- The UI is non-blocking and fully event-driven
-- All network I/O is handled asynchronously via Qt signals
-- Business logic remains minimal on the client side
-- The client strictly follows the server-defined protocol
-
-
-
-
+-   **Connection Refused**: Ensure the Server is running and the IP/Port in `mainwindow.cpp` matches the Server.
+-   **Compilation Errors**: If `ui_*.h` files are missing, run `qmake` again before `make`.
