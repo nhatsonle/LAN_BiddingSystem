@@ -12,7 +12,6 @@ This repository contains two main components:
 ## ✨ Key Features
 
 -   **Real-time Interaction**: Bids, chat messages, and timer updates are broadcasted instantly to all participants in a room.
--   **Finance System**: Users have a wallet balance. Bids are validated against available funds, and winners are automatically charged.
 -   **Multi-Room Support**: Multiple auction rooms can run concurrently, each with its own product queue.
 -   **Robust Persistence**: All data (users, rooms, products, history) is stored in a SQLite database.
 -   **Deployment Friendly**: Includes guides for local usage and exposing to the internet via ngrok.
