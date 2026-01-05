@@ -134,15 +134,15 @@
         </property>
        </widget>
        <widget class="QTableWidget" name="listRooms">
-         <property name="geometry">
-          <rect>
-           <x>20</x>
-           <y>80</y>
-           <width>681</width>
-           <height>321</height>
-          </rect>
-         </property>
-        </widget>
+        <property name="geometry">
+         <rect>
+          <x>20</x>
+          <y>80</y>
+          <width>681</width>
+          <height>321</height>
+         </rect>
+        </property>
+       </widget>
        <widget class="QPushButton" name="btnCreateRoom">
         <property name="geometry">
          <rect>
@@ -191,8 +191,8 @@ QPushButton:hover { background-color: #219150; }</string>
        <widget class="QPushButton" name="btnProfile">
         <property name="geometry">
          <rect>
-          <x>140</x>
-          <y>480</y>
+          <x>380</x>
+          <y>430</y>
           <width>101</width>
           <height>31</height>
          </rect>
@@ -266,27 +266,27 @@ QPushButton:hover { background-color: #219150; }</string>
           <height>18</height>
          </rect>
         </property>
-       <property name="text">
-        <string>Đang đấu giá:</string>
-       </property>
-      </widget>
-      <widget class="QPushButton" name="btnShowDescription">
-       <property name="geometry">
-        <rect>
-         <x>80</x>
-         <y>45</y>
-         <width>150</width>
-         <height>26</height>
-        </rect>
-       </property>
-       <property name="text">
-        <string>Xem mô tả</string>
-       </property>
-      </widget>
-      <widget class="QLCDNumber" name="lcdTimer">
-       <property name="geometry">
-        <rect>
-         <x>260</x>
+        <property name="text">
+         <string>Đang đấu giá:</string>
+        </property>
+       </widget>
+       <widget class="QPushButton" name="btnShowDescription">
+        <property name="geometry">
+         <rect>
+          <x>80</x>
+          <y>45</y>
+          <width>150</width>
+          <height>26</height>
+         </rect>
+        </property>
+        <property name="text">
+         <string>Xem mô tả</string>
+        </property>
+       </widget>
+       <widget class="QLCDNumber" name="lcdTimer">
+        <property name="geometry">
+         <rect>
+          <x>260</x>
           <y>20</y>
           <width>220</width>
           <height>60</height>
