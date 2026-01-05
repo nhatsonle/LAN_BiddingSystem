@@ -17,6 +17,8 @@ QT_END_NAMESPACE
 
 struct ProductInfo;
 class QPushButton;
+class QLineEdit;
+class QComboBox;
 class QTableWidget;
 class QWidget;
 
@@ -57,11 +59,18 @@ private slots:
   void on_btnSendChat_clicked();
   void on_btnLogout_clicked();
   void showMyRoomsView();
+  void showProductsView();
   void reloadMyRooms();
   void editSelectedRoom();
   void stopSelectedRoom();
   void backToLobbyFromMyRooms();
   void myRoomsSelectionChanged();
+  void refreshAllProducts();
+  void backToLobbyFromProducts();
+  void productsSelectionChanged();
+  void joinSelectedProductRoom();
+  void on_productSearch_textChanged(const QString &text);
+  void applyProductFiltersAndSort();
 
 private:
   Ui::MainWindow *ui;
@@ -88,6 +97,19 @@ private:
   QPushButton *m_btnStopMyRoom = nullptr;
   QPushButton *m_btnBackToLobby = nullptr;
   QPushButton *m_btnMyRoomsButton = nullptr;
+  QWidget *m_pageProducts = nullptr;
+  QLineEdit *m_txtProductSearch = nullptr;
+  QComboBox *m_cboProductStatus = nullptr;
+  QComboBox *m_cboProductSort = nullptr;
+  QTableWidget *m_tblAllProducts = nullptr;
+  QPushButton *m_btnReloadProducts = nullptr;
+  QPushButton *m_btnJoinProductRoom = nullptr;
+  QPushButton *m_btnBackFromProducts = nullptr;
+  QPushButton *m_btnProductsButton = nullptr;
+  bool m_collectAllProducts = false;
+  QSet<int> m_pendingProductRoomIds;
+  int m_pendingSelectRoomId = -1;
+  int m_pendingSelectProductId = -1;
   qint64 m_myRoomsServerEpoch = 0;
   QElapsedTimer m_myRoomsElapsed;
   QTimer *m_myRoomsGateTimer = nullptr;
@@ -106,5 +128,7 @@ private:
   qint64 myRoomsNowEpoch() const;
   bool canEditMyRoomRow(int row, QString *outReason = nullptr) const;
   bool canStopMyRoomRow(int row) const;
+  void renumberLobbyRows();
+  void renumberProductRows();
 };
 #endif // MAINWINDOW_H

@@ -13,6 +13,9 @@ CreateRoomDialog::CreateRoomDialog(QWidget *parent) :
 {
     ui->setupUi(this);
 
+    // Default start time = local time; keep it unchanged when adding/editing products.
+    ui->dtStartTime->setDateTime(QDateTime::currentDateTime());
+
     // --- CẤU HÌNH SPINBOX GIÁ ---
 
     // 1. Tăng giới hạn tối đa (Mặc định là 99 -> Sửa thành 2 tỷ)
