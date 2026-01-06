@@ -344,7 +344,7 @@ void MainWindow::on_btnLogin_clicked() {
   // 1. Kết nối tới Server (nếu chưa)
   if (m_socket->state() != QAbstractSocket::ConnectedState) {
     m_socket->connectToHost("0.tcp.ap.ngrok.io",
-                            13541); // Hardcode IP cho nhanh, hoặc lấy từ ô nhập
+                            13238); // Hardcode IP cho nhanh, hoặc lấy từ ô nhập
     if (!m_socket->waitForConnected(3000)) {
       QMessageBox::critical(this, "Lỗi", "Không thể kết nối Server!");
       return;
@@ -611,7 +611,7 @@ void MainWindow::on_btnOpenRegister_clicked() {
     // 1. KIỂM TRA VÀ TỰ ĐỘNG KẾT NỐI NẾU CẦN
     if (m_socket->state() != QAbstractSocket::ConnectedState) {
       // Thay "127.0.0.1" và 8080 bằng IP/Port server của bạn nếu khác
-      m_socket->connectToHost("0.tcp.ap.ngrok.io", 13541);
+      m_socket->connectToHost("0.tcp.ap.ngrok.io", 13238);
 
       // Chờ tối đa 3 giây để kết nối
       if (!m_socket->waitForConnected(3000)) {
@@ -699,7 +699,8 @@ void MainWindow::onReadyRead() {
       QString newName = line.section('|', 2, 2);
       ProfileDialog *dlg = this->findChild<ProfileDialog *>();
       if (dlg && dlg->isVisible()) {
-        dlg->onChangeDisplayNameResult(true, "Đổi tên hiển thị thành công!", newName);
+        dlg->onChangeDisplayNameResult(true, "Đổi tên hiển thị thành công!",
+                                       newName);
       }
       // Optional: update local cached username label if you have one
     } else if (line.startsWith("ERR|INVALID_NAME")) {
