@@ -73,6 +73,24 @@
          </property>
         </widget>
        </item>
+      
+       <item row="4" column="0">
+        <widget class="QLabel" name="labelDisplayName">
+         <property name="text">
+          <string>Tên hiển thị:</string>
+         </property>
+        </widget>
+       </item>
+       <item row="4" column="1">
+        <widget class="QLineEdit" name="txtDisplayName"/>
+       </item>
+       <item row="5" column="1">
+        <widget class="QPushButton" name="btnChangeDisplayName">
+         <property name="text">
+          <string>Cập nhật Tên</string>
+         </property>
+        </widget>
+       </item>
       </layout>
      </widget>
      <widget class="QWidget" name="tabHistory">

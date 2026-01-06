@@ -22,6 +22,7 @@ using BroadcastCallback = std::function<void(int, std::string)>;
 struct UserSession {
   int userId;
   std::string username;
+  std::string displayName;
 };
 
 class RoomManager {
@@ -75,8 +76,10 @@ public:
   std::vector<std::pair<int, int>> removeClient(SocketType clientSocket);
 
   // Quản lý User Login
-  void loginUser(SocketType sock, int userId, std::string name);
+  void loginUser(SocketType sock, int userId, std::string username, std::string displayName);
   std::string getUsername(SocketType sock);
+  std::string getDisplayName(SocketType sock);
+  void setDisplayName(SocketType sock, const std::string &newDisplayName);
   int getUserId(SocketType sock);
   bool isUserLoggedIn(const std::string &username); // Check duplicate login
 

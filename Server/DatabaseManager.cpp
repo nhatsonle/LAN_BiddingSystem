@@ -89,9 +89,26 @@ bool DatabaseManager::init(const std::string &dbName) {
                          "id INTEGER PRIMARY KEY AUTOINCREMENT,"
                          "username TEXT UNIQUE NOT NULL,"
                          "password TEXT NOT NULL,"
+                         "display_name TEXT,"
                          "created_at DATETIME DEFAULT CURRENT_TIMESTAMP);";
 
-  rc = sqlite3_exec(db, sqlUsers, 0, 0, &zErrMsg);
+  
+  // --- MIGRATION: add display_name column for older DB files ---
+  // If column already exists, SQLite will return an error -> ignore.
+  {
+    char *zErrMsg2 = 0;
+    int rc2 = sqlite3_exec(db, "ALTER TABLE users ADD COLUMN display_name TEXT;", 0, 0, &zErrMsg2);
+    if (rc2 != SQLITE_OK) {
+      // ignore duplicate column error
+      if (zErrMsg2) sqlite3_free(zErrMsg2);
+    } else {
+      if (zErrMsg2) sqlite3_free(zErrMsg2);
+    }
+    // Fill missing display_name with username
+    sqlite3_exec(db, "UPDATE users SET display_name = username WHERE display_name IS NULL OR TRIM(display_name)='';", 0, 0, 0);
+  }
+
+rc = sqlite3_exec(db, sqlUsers, 0, 0, &zErrMsg);
   if (rc != SQLITE_OK) {
     std::cerr << "SQL error (Create Users): " << zErrMsg << std::endl;
     sqlite3_free(zErrMsg);
@@ -199,8 +216,8 @@ bool DatabaseManager::init(const std::string &dbName) {
 
 bool DatabaseManager::registerUser(const std::string &username,
                                    const std::string &password) {
-  std::string sql = "INSERT INTO users (username, password) VALUES ('" +
-                    username + "', '" + password + "');";
+  std::string sql = "INSERT INTO users (username, password, display_name) VALUES ('" +
+                    username + "', '" + password + "', '" + username + "');";
 
   char *zErrMsg = 0;
   int rc = sqlite3_exec(db, sql.c_str(), 0, 0, &zErrMsg);
@@ -272,7 +289,7 @@ std::string DatabaseManager::getHistoryList(const std::string &username) {
   std::string list = "";
   // JOIN to filter by username
   std::string sql =
-      "SELECT h.item_name, h.final_price, COALESCE(w.username, 'Unknown') "
+      "SELECT h.item_name, h.final_price, COALESCE(w.display_name, w.username, 'Unknown') "
       "FROM history h "
       "JOIN auction_participants ap ON h.id = ap.history_id "
       "JOIN users u ON ap.user_id = u.id "
@@ -747,3 +764,38 @@ std::vector<Room> DatabaseManager::loadOpenRooms() {
 
   return result;
 }
+
+
+bool DatabaseManager::updateDisplayName(int userId, const std::string &newDisplayName) {
+  std::string safe = escapeSqlString(newDisplayName);
+  std::string sql = "UPDATE users SET display_name='" + safe + "' WHERE id=" +
+                    std::to_string(userId) + ";";
+  char *zErrMsg = 0;
+  int rc = sqlite3_exec(db, sql.c_str(), 0, 0, &zErrMsg);
+  if (rc != SQLITE_OK) {
+    if (zErrMsg)
+      sqlite3_free(zErrMsg);
+    return false;
+  }
+  return true;
+}
+
+std::string DatabaseManager::getDisplayNameByUserId(int userId) {
+  std::string res = "";
+  std::string sql = "SELECT COALESCE(display_name, username, '') FROM users WHERE id=" +
+                    std::to_string(userId) + " LIMIT 1;";
+
+  auto cb = [](void *data, int argc, char **argv, char **col) -> int {
+    std::string *out = (std::string *)data;
+    if (argc > 0 && argv[0])
+      *out = argv[0];
+    return 0;
+  };
+
+  char *zErrMsg = 0;
+  sqlite3_exec(db, sql.c_str(), cb, &res, &zErrMsg);
+  if (zErrMsg)
+    sqlite3_free(zErrMsg);
+  return res;
+}
+

@@ -87,7 +87,7 @@ int RoomManager::createRoom(std::string roomName, std::vector<Product> products,
   newRoom.highestBidderUserId = -1;
   newRoom.highestBidderName = "";
   if (userMap.count(ownerSocket))
-    newRoom.hostName = userMap[ownerSocket].username;
+    newRoom.hostName = userMap[ownerSocket].displayName.empty() ? userMap[ownerSocket].username : userMap[ownerSocket].displayName;
   else
     newRoom.hostName = "N/A";
   newRoom.hostUserId = ownerUserId;
@@ -151,7 +151,7 @@ bool RoomManager::buyNow(int roomId, SocketType buyerSocket,
       r.currentPrice = r.buyNowPrice; // Giá chốt = Giá mua ngay
       r.highestBidderSocket = buyerSocket;
       r.highestBidderUserId = buyerUserId;
-      r.highestBidderName = getUsername(buyerSocket);
+      r.highestBidderName = getDisplayName(buyerSocket);
       r.timeLeft = 0; // Dừng đồng hồ sản phẩm này
 
       // Update DB status của sản phẩm hiện tại
@@ -317,7 +317,7 @@ bool RoomManager::placeBid(int roomId, int amount, SocketType bidderSocket,
       }
       // Nếu giá bid chạm/qua giá mua ngay -> xử lý mua ngay
       if (amount >= r.buyNowPrice) {
-        std::string bidderName = getUsername(bidderSocket);
+        std::string bidderName = getDisplayName(bidderSocket);
         int soldProductId = r.currentProductId;
         r.currentPrice = r.buyNowPrice;
         r.highestBidderSocket = bidderSocket;
@@ -366,7 +366,7 @@ bool RoomManager::placeBid(int roomId, int amount, SocketType bidderSocket,
       }
       // Yêu cầu: Giá mới phải cao hơn hoặc bằng giá cũ + 10.000
       if (amount >= r.currentPrice + 10000) {
-        std::string bidderName = getUsername(bidderSocket);
+        std::string bidderName = getDisplayName(bidderSocket);
         r.currentPrice = amount;
         r.highestBidderSocket = bidderSocket;
         r.highestBidderUserId = bidderUserId;
@@ -460,9 +460,9 @@ std::vector<std::pair<int, int>> RoomManager::removeClient(SocketType clientSock
   return affectedRooms;
 }
 
-void RoomManager::loginUser(SocketType sock, int userId, std::string name) {
+void RoomManager::loginUser(SocketType sock, int userId, std::string username, std::string displayName) {
   std::lock_guard<std::recursive_mutex> lock(roomsMutex);
-  userMap[sock] = {userId, name};
+  userMap[sock] = {userId, username, displayName};
 }
 
 std::string RoomManager::getUsername(SocketType sock) {
@@ -471,6 +471,26 @@ std::string RoomManager::getUsername(SocketType sock) {
     return userMap[sock].username;
   return "Unknown";
 }
+
+std::string RoomManager::getDisplayName(SocketType sock) {
+  std::lock_guard<std::recursive_mutex> lock(roomsMutex);
+  if (userMap.count(sock)) {
+    const auto &dn = userMap[sock].displayName;
+    if (!dn.empty())
+      return dn;
+    return userMap[sock].username;
+  }
+  return "Unknown";
+}
+
+void RoomManager::setDisplayName(SocketType sock, const std::string &newDisplayName) {
+  std::lock_guard<std::recursive_mutex> lock(roomsMutex);
+  if (userMap.count(sock)) {
+    userMap[sock].displayName = newDisplayName;
+  }
+}
+
+
 
 int RoomManager::getUserId(SocketType sock) {
   std::lock_guard<std::recursive_mutex> lock(roomsMutex);
@@ -572,7 +592,7 @@ void RoomManager::updateTimers(BroadcastCallback callback) {
         }
 
         if (r.highestBidderName.empty())
-          r.highestBidderName = getUsername(r.highestBidderSocket);
+          r.highestBidderName = getDisplayName(r.highestBidderSocket);
         DatabaseManager::getInstance().saveAuctionResult(
             r.id, r.currentProductId, r.itemName, r.currentPrice,
             r.highestBidderUserId, participantIds);

@@ -169,8 +169,10 @@ std::string AuctionServer::processCommand(SocketType clientSocket,
 
     // GỌI DB ĐỂ CHECK
     if (DatabaseManager::getInstance().checkLogin(u, p, userId)) {
-      RoomManager::getInstance().loginUser(clientSocket, userId, u);
-      return "OK|LOGIN_SUCCESS|Welcome " + u;
+      std::string dn = DatabaseManager::getInstance().getDisplayNameByUserId(userId);
+      if (dn.empty()) dn = u;
+      RoomManager::getInstance().loginUser(clientSocket, userId, u, dn);
+      return "OK|LOGIN_SUCCESS|Welcome " + dn;
     } else {
       return "ERR|LOGIN_FAILED";
     }
@@ -300,7 +302,7 @@ std::string AuctionServer::processCommand(SocketType clientSocket,
     if (RoomManager::getInstance().joinRoom(roomId, clientSocket, info)) {
       // Broadcast thông báo vào phòng
       std::string username =
-          RoomManager::getInstance().getUsername(clientSocket);
+          RoomManager::getInstance().getDisplayName(clientSocket);
       std::string joinMsg = "CHAT|" + username + "|đã tham gia phòng\n";
       broadcastToRoom(roomId, joinMsg);
 
@@ -335,7 +337,7 @@ std::string AuctionServer::processCommand(SocketType clientSocket,
       return "ERR|MISSING_ARGS";
     int rId = std::stoi(tokens[1]);
     std::string chatMsg = tokens[2];
-    std::string username = RoomManager::getInstance().getUsername(clientSocket);
+    std::string username = RoomManager::getInstance().getDisplayName(clientSocket);
 
     // Broadcast chat với username
     std::string broadcastMsg = "CHAT|" + username + "|" + chatMsg + "\n";
@@ -357,10 +359,35 @@ std::string AuctionServer::processCommand(SocketType clientSocket,
       return "ERR|ROOM_NOT_FOUND_OR_NOT_IN";
     }
   } else if (cmd == "VIEW_HISTORY") {
-    std::string username = RoomManager::getInstance().getUsername(clientSocket);
+    std::string username = RoomManager::getInstance().getDisplayName(clientSocket);
     std::string history =
         DatabaseManager::getInstance().getHistoryList(username);
     return "OK|HISTORY|" + history;
+
+  } else if (cmd == "CHANGE_DISPLAY_NAME") { // CHANGE_DISPLAY_NAME|newName
+    if (tokens.size() < 2)
+      return "ERR|MISSING_ARGS";
+    std::string newName = tokens[1];
+    // basic validation
+    if (newName.empty())
+      return "ERR|INVALID_NAME";
+    if (newName.size() > 32)
+      return "ERR|NAME_TOO_LONG";
+    for (char &c : newName) {
+      if (c == '|' || c == '\n' || c == '\r' || c == ';' || c == ',')
+        c = ' ';
+    }
+
+    int userId = RoomManager::getInstance().getUserId(clientSocket);
+    if (userId <= 0)
+      return "ERR|NOT_LOGGED_IN";
+
+    if (DatabaseManager::getInstance().updateDisplayName(userId, newName)) {
+      RoomManager::getInstance().setDisplayName(clientSocket, newName);
+      return "OK|DISPLAY_NAME_CHANGED|" + newName;
+    }
+    return "ERR|DB_ERROR";
+
   } else if (cmd == "CHANGE_PASS") { // CHANGE_PASS|old|new
     if (tokens.size() < 3)
       return "ERR|MISSING_ARGS";
@@ -381,14 +408,14 @@ std::string AuctionServer::processCommand(SocketType clientSocket,
       return "ERR|WRONG_PASS";
     }
   } else if (cmd == "GET_WON") {
-    std::string username = RoomManager::getInstance().getUsername(clientSocket);
+    std::string username = RoomManager::getInstance().getDisplayName(clientSocket);
     if (username.empty())
       return "ERR|NOT_LOGGED_IN";
 
     std::string list = DatabaseManager::getInstance().getWonItems(username);
     return "OK|WON_LIST|" + list;
   } else if (cmd == "GET_HISTORY") {
-    std::string username = RoomManager::getInstance().getUsername(clientSocket);
+    std::string username = RoomManager::getInstance().getDisplayName(clientSocket);
     if (username.empty())
       return "ERR|NOT_LOGGED_IN";
 

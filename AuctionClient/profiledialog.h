@@ -21,9 +21,11 @@ public:
   void updateHistory(const QString &data);
   void updateWonList(const QString &data);
   void onChangePassResult(bool success, const QString &msg);
+  void onChangeDisplayNameResult(bool success, const QString &msg, const QString &newName = "");
 
 private slots:
   void on_btnChangePass_clicked();
+  void on_btnChangeDisplayName_clicked();
   void on_btnRefreshHistory_clicked();
   void on_btnRefreshWon_clicked();
   void on_btnClose_clicked();
