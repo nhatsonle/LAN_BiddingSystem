@@ -35,6 +35,10 @@ public:
   bool updatePassword(int userId, const std::string &newPassword);
   std::string getWonItems(const std::string &username);
 
+  // --- Display name (Profile rename) ---
+  bool updateDisplayName(int userId, const std::string &newDisplayName);
+  std::string getDisplayNameByUserId(int userId);
+
   // --- Room & Product Management ---
   // --- Room & Product Management ---
   int createRoom(const std::string &name, int createdByUserId = -1,

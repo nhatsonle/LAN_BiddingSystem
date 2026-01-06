@@ -695,6 +695,24 @@ void MainWindow::onReadyRead() {
 
       // Tự động lấy danh sách phòng luôn
       on_btnRefresh_clicked();
+    } else if (line.startsWith("OK|DISPLAY_NAME_CHANGED")) {
+      QString newName = line.section('|', 2, 2);
+      ProfileDialog *dlg = this->findChild<ProfileDialog *>();
+      if (dlg && dlg->isVisible()) {
+        dlg->onChangeDisplayNameResult(true, "Đổi tên hiển thị thành công!", newName);
+      }
+      // Optional: update local cached username label if you have one
+    } else if (line.startsWith("ERR|INVALID_NAME")) {
+      ProfileDialog *dlg = this->findChild<ProfileDialog *>();
+      if (dlg && dlg->isVisible()) {
+        dlg->onChangeDisplayNameResult(false, "Tên hiển thị không hợp lệ.");
+      }
+    } else if (line.startsWith("ERR|NAME_TOO_LONG")) {
+      ProfileDialog *dlg = this->findChild<ProfileDialog *>();
+      if (dlg && dlg->isVisible()) {
+        dlg->onChangeDisplayNameResult(false, "Tên hiển thị quá dài.");
+      }
+
     } else if (line.startsWith("ERR|WRONG_PASS")) {
       QMessageBox::warning(this, "Lỗi", "Sai mật khẩu!");
     }

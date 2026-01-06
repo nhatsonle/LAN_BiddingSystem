@@ -35,6 +35,23 @@ void ProfileDialog::on_btnChangePass_clicked() {
   m_mainWindow->sendRequest("CHANGE_PASS|" + oldP + "|" + newP + "\n");
 }
 
+
+void ProfileDialog::on_btnChangeDisplayName_clicked() {
+  QString newName = ui->txtDisplayName->text().trimmed();
+
+  if (newName.isEmpty()) {
+    QMessageBox::warning(this, "Lỗi", "Vui lòng nhập tên hiển thị mới.");
+    return;
+  }
+  if (newName.length() > 32) {
+    QMessageBox::warning(this, "Lỗi", "Tên hiển thị quá dài (tối đa 32 ký tự).");
+    return;
+  }
+
+  m_mainWindow->sendRequest("CHANGE_DISPLAY_NAME|" + newName + "\n");
+}
+
+
 void ProfileDialog::on_btnRefreshHistory_clicked() {
   m_mainWindow->sendRequest("GET_HISTORY\n");
 }
@@ -55,6 +72,20 @@ void ProfileDialog::onChangePassResult(bool success, const QString &msg) {
     QMessageBox::critical(this, "Lỗi", msg);
   }
 }
+
+
+void ProfileDialog::onChangeDisplayNameResult(bool success, const QString &msg,
+                                              const QString &newName) {
+  if (success) {
+    QMessageBox::information(this, "Thành công", msg);
+    if (!newName.isEmpty()) {
+      ui->txtDisplayName->setText(newName);
+    }
+  } else {
+    QMessageBox::critical(this, "Lỗi", msg);
+  }
+}
+
 
 void ProfileDialog::updateHistory(const QString &data) {
   ui->listHistory->clear();
